@@ -40,7 +40,7 @@ export default function LoginPage() {
           <div className="w-12 h-12 rounded-2xl bg-brand-600 text-white mx-auto flex items-center justify-center font-bold text-xl shadow-lg shadow-brand-500/25">
             <Zap className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Sign In to SwiftShare</h2>
+          <h2 className="text-2xl font-bold text-white">Sign In to Transora</h2>
           <p className="text-xs text-slate-400">Access your saved transfers and high-speed quotas.</p>
         </div>
 

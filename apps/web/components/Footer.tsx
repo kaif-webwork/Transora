@@ -11,7 +11,7 @@ export function Footer() {
             <Zap className="w-4 h-4 text-white" />
           </div>
           <span className="text-sm text-slate-400">
-            © 2026 SwiftShare Platform. Enterprise-Grade Ultra-Fast File Transfer.
+            © 2026 Transora Platform. Enterprise-Grade Ultra-Fast File Transfer.
           </span>
         </div>
 

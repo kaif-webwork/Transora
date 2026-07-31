@@ -68,7 +68,7 @@ export default function DashboardPage() {
             <LayoutDashboard className="w-7 h-7 text-brand-400" /> Real-Time Dashboard
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Live metrics connected to SwiftShare backend storage and active transfer streams.
+            Live metrics connected to Transora backend storage and active transfer streams.
           </p>
         </div>
         <Link

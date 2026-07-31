@@ -40,7 +40,7 @@ export default function App() {
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.logoText}>SwiftShare Mobile</Text>
+          <Text style={styles.logoText}>Transora Mobile</Text>
           <Text style={styles.tagline}>Share Anything. Instantly.</Text>
         </View>
 

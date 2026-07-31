@@ -7,7 +7,7 @@ import { Footer } from '../components/Footer';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SwiftShare | Share Anything. Instantly.',
+  title: 'Transora | Share Anything. Instantly.',
   description: 'Enterprise-grade ultra-fast file transfer platform over WebRTC LAN or Cloudflare R2 object storage.',
 };
 

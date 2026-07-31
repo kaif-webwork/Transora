@@ -41,7 +41,7 @@ export default function RegisterPage() {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-neon-purple text-white mx-auto flex items-center justify-center font-bold text-xl shadow-lg">
             <Zap className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Create SwiftShare Account</h2>
+          <h2 className="text-2xl font-bold text-white">Create Transora Account</h2>
           <p className="text-xs text-slate-400">Unlock 100 GB cloud storage and unlimited LAN transfers.</p>
         </div>
 

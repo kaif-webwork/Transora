@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const swaggerSpec = {
   openapi: '3.0.0',
   info: {
-    title: 'SwiftShare API Specifications',
+    title: 'Transora API Specifications',
     version: '1.0.0',
     description: 'Enterprise-grade File Sharing API with progressive chunk upload and WebRTC P2P support.',
   },
@@ -52,7 +52,7 @@ app.use('/api/v1/admin', adminRoutes);
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'SwiftShare Backend', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'Transora Backend', timestamp: new Date().toISOString() });
 });
 
 // Global Error Handler
@@ -70,7 +70,7 @@ async function startServer() {
   const localIp = getLocalIpAddress();
   httpServer.listen(config.port, '0.0.0.0', () => {
     console.log(`=================================================`);
-    console.log(`🚀 SwiftShare Backend running on http://0.0.0.0:${config.port}`);
+    console.log(`🚀 Transora Backend running on http://0.0.0.0:${config.port}`);
     console.log(`📱 Mobile / LAN Access URL: http://${localIp}:${config.port}`);
     console.log(`📚 Swagger API Docs: http://${localIp}:${config.port}/docs`);
     console.log(`=================================================`);

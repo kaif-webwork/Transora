@@ -29,7 +29,7 @@ export function Navbar() {
             </div>
             <div>
               <span className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-                SwiftShare
+              Transora
                 <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wider font-semibold rounded bg-brand-500/20 text-brand-300 border border-brand-500/30">
                   PRO
                 </span>

@@ -86,7 +86,7 @@ export default function ReceivePage() {
       {loading ? (
         <div className="glass-panel rounded-3xl p-12 text-center space-y-4">
           <div className="w-12 h-12 rounded-full border-4 border-brand-500 border-t-transparent animate-spin mx-auto" />
-          <p className="text-sm text-slate-400">Connecting to SwiftShare Sender Stream...</p>
+          <p className="text-sm text-slate-400">Connecting to Transora Sender Stream...</p>
         </div>
       ) : error ? (
         <div className="glass-panel rounded-3xl p-12 text-center space-y-4 border-rose-500/30">
