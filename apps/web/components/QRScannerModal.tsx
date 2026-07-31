@@ -17,7 +17,7 @@ export function QRScannerModal({ onClose }: QRScannerModalProps) {
 
   useEffect(() => {
     let stream: MediaStream | null = null;
-    let animFrame: number;
+    let animFrame: number | null = null;
 
     async function startCamera() {
       try {
@@ -43,7 +43,9 @@ export function QRScannerModal({ onClose }: QRScannerModalProps) {
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
-      if (animFrame) cancelAnimationFrame(animFrame);
+      if (animFrame !== null) {
+        cancelAnimationFrame(animFrame);
+      }
     };
   }, []);
 
