@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { pool } from '../db/index.js';
 import { StorageService } from './StorageService.js';
 import { RedisService } from './RedisService.js';
-import { InitTransferRequest } from '@swiftshare/shared';
+import { InitTransferRequest } from '@transora/shared';
 import { config } from '../config/index.js';
 import bcrypt from 'bcryptjs';
 

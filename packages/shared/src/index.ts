@@ -1,28 +1,15 @@
-// SwiftShare Shared Data Models & Interfaces
+// Transora Shared Data Models & Interfaces
 
-export type UserRole = 'GUEST' | 'USER' | 'ADMIN';
-
-export type TransferStatus = 
-  | 'INITIALIZED' 
-  | 'UPLOADING' 
-  | 'READY' 
-  | 'DOWNLOADING' 
-  | 'COMPLETED' 
-  | 'EXPIRED' 
-  | 'CANCELLED' 
-  | 'FAILED';
-
-export type TransferMode = 'CLOUD_CHUNK' | 'WEBRTC_LAN' | 'DIRECT_P2P';
-
-export type LinkExpiryType = '1_HOUR' | '24_HOURS' | '7_DAYS' | 'NEVER';
+export type TransferStatus = 'INITIALIZED' | 'UPLOADING' | 'COMPLETED' | 'EXPIRED' | 'CANCELLED';
+export type TransferMode = 'CLOUD_CHUNK' | 'WEBRTC_LAN';
+export type ExpiryType = '1_HOUR' | '24_HOURS' | '7_DAYS' | 'NEVER';
+export type UserRole = 'USER' | 'ADMIN';
 
 export interface User {
   id: string;
   email: string;
   fullName: string;
-  avatarUrl?: string;
   role: UserRole;
-  isVerified: boolean;
   storageQuotaBytes: number;
   storageUsedBytes: number;
   createdAt: string;
@@ -38,13 +25,6 @@ export interface FileMetadata {
   sha256Checksum: string;
 }
 
-export interface FileChunkInfo {
-  index: number;
-  sizeBytes: number;
-  sha256Checksum: string;
-  isUploaded: boolean;
-}
-
 export interface Transfer {
   id: string;
   senderId?: string;
@@ -55,29 +35,27 @@ export interface Transfer {
   status: TransferStatus;
   isE2EE: boolean;
   encryptionSalt?: string;
-  hasPassword?: boolean;
+  passwordHash?: string;
   maxDownloads?: number;
   downloadCount: number;
   totalSizeBytes: number;
   totalChunks: number;
   uploadedChunks: number;
-  expiryType: LinkExpiryType;
+  expiryType: ExpiryType;
   expiresAt?: string;
   createdAt: string;
   files: FileMetadata[];
 }
 
-// Request & Response DTOs
-
 export interface InitTransferRequest {
-  title: string;
+  title?: string;
   description?: string;
+  password?: string;
+  expiryType?: ExpiryType;
+  maxDownloads?: number;
   transferMode?: TransferMode;
   isE2EE?: boolean;
   encryptionSalt?: string;
-  password?: string;
-  maxDownloads?: number;
-  expiryType?: LinkExpiryType;
   files: {
     fileName: string;
     fileSizeBytes: number;
@@ -88,50 +66,15 @@ export interface InitTransferRequest {
   }[];
 }
 
-export interface InitTransferResponse {
-  transferId: string;
-  shareCode: string;
-  shareUrl: string;
-  uploadUrls?: { fileId: string; chunkIndex: number; uploadUrl: string }[];
+// WebSockets Socket.IO Protocol Events
+export interface ServerToClientEvents {
+  'chunk:progress': (data: { transferId: string; uploadedChunks: number; totalChunks: number; speedBps: number }) => void;
+  'transfer:complete': (data: { transferId: string; shareCode: string; downloadUrl: string }) => void;
+  'receiver:joined': (data: { transferId: string }) => void;
+  'webrtc:signal': (data: { senderId: string; signal: any }) => void;
 }
 
-export interface ChunkUploadMetadata {
-  transferId: string;
-  fileId: string;
-  chunkIndex: number;
-  chunkSizeBytes: number;
-  sha256Checksum: string;
-}
-
-export interface SystemStats {
-  totalUsers: number;
-  activeTransfers: number;
-  completedTransfers: number;
-  totalBytesTransferred: number;
-  activeSockets: number;
-}
-
-// Socket.IO Real-time Events
-export interface SocketServerToClientEvents {
-  'transfer:status_changed': (data: { transferId: string; status: TransferStatus }) => void;
-  'chunk:progress': (data: { 
-    transferId: string; 
-    fileId: string; 
-    chunkIndex: number; 
-    totalUploadedChunks: number;
-    totalChunks: number;
-    speedBps: number;
-    percentage: number;
-  }) => void;
-  'chunk:available': (data: { transferId: string; fileId: string; chunkIndex: number }) => void;
-  'receiver:joined': (data: { transferId: string; receiverSocketId: string }) => void;
-  'webrtc:signal': (data: { senderSocketId: string; signal: any }) => void;
-  'notification': (data: { type: 'success' | 'info' | 'warning' | 'error'; message: string }) => void;
-}
-
-export interface SocketClientToServerEvents {
+export interface ClientToServerEvents {
   'transfer:join': (data: { transferId: string; role: 'sender' | 'receiver' }) => void;
-  'transfer:leave': (data: { transferId: string }) => void;
-  'chunk:notify_uploaded': (data: { transferId: string; fileId: string; chunkIndex: number }) => void;
-  'webrtc:signal': (data: { targetSocketId: string; signal: any }) => void;
+  'webrtc:signal': (data: { transferId: string; signal: any }) => void;
 }

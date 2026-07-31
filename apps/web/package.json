@@ -1,5 +1,5 @@
 {
-  "name": "@swiftshare/web",
+  "name": "@transora/web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "lint": "npx next lint"
   },
   "dependencies": {
-    "@swiftshare/shared": "*",
+    "@transora/shared": "*",
     "@tanstack/react-query": "^5.24.1",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.8",

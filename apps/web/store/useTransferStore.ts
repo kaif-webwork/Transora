@@ -1,55 +1,25 @@
 import { create } from 'zustand';
-import { Transfer, TransferStatus } from '@swiftshare/shared';
+import { Transfer, TransferStatus } from '@transora/shared';
 
-interface TransferProgress {
+interface TransferState {
+  currentTransfer: Transfer | null;
   uploadedChunks: number;
   totalChunks: number;
-  currentSpeedBps: number;
-  etaSeconds: number;
-  percentage: number;
-}
-
-interface TransferStoreState {
-  activeTransfer: Transfer | null;
-  progress: TransferProgress;
-  isUploading: boolean;
-  setActiveTransfer: (transfer: Transfer | null) => void;
+  transferSpeedBps: number;
+  status: TransferStatus;
+  setTransfer: (transfer: Transfer) => void;
   updateProgress: (uploadedChunks: number, totalChunks: number, speedBps: number) => void;
-  resetProgress: () => void;
+  setStatus: (status: TransferStatus) => void;
 }
 
-export const useTransferStore = create<TransferStoreState>((set) => ({
-  activeTransfer: null,
-  progress: {
-    uploadedChunks: 0,
-    totalChunks: 0,
-    currentSpeedBps: 0,
-    etaSeconds: 0,
-    percentage: 0,
-  },
-  isUploading: false,
-  setActiveTransfer: (transfer) => set({ activeTransfer: transfer }),
-  updateProgress: (uploadedChunks, totalChunks, speedBps) => {
-    const percentage = totalChunks > 0 ? Math.min(Math.round((uploadedChunks / totalChunks) * 100), 100) : 0;
-    const remainingChunks = totalChunks - uploadedChunks;
-    // Estimate 5MB per chunk
-    const remainingBytes = remainingChunks * 5 * 1024 * 1024;
-    const etaSeconds = speedBps > 0 ? Math.ceil(remainingBytes / speedBps) : 0;
-
-    set({
-      progress: {
-        uploadedChunks,
-        totalChunks,
-        currentSpeedBps: speedBps,
-        etaSeconds,
-        percentage,
-      },
-      isUploading: uploadedChunks < totalChunks,
-    });
-  },
-  resetProgress: () =>
-    set({
-      progress: { uploadedChunks: 0, totalChunks: 0, currentSpeedBps: 0, etaSeconds: 0, percentage: 0 },
-      isUploading: false,
-    }),
+export const useTransferStore = create<TransferState>((set) => ({
+  currentTransfer: null,
+  uploadedChunks: 0,
+  totalChunks: 0,
+  transferSpeedBps: 0,
+  status: 'INITIALIZED',
+  setTransfer: (transfer) => set({ currentTransfer: transfer }),
+  updateProgress: (uploadedChunks, totalChunks, speedBps) =>
+    set({ uploadedChunks, totalChunks, transferSpeedBps: speedBps }),
+  setStatus: (status) => set({ status }),
 }));

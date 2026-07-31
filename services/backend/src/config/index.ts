@@ -19,16 +19,16 @@ const localIp = getLocalIpAddress();
 export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  jwtSecret: process.env.JWT_SECRET || 'swiftshare_super_secret_jwt_key_2026',
+  jwtSecret: process.env.JWT_SECRET || 'transora_super_secret_jwt_key_2026',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   localIp,
   
   postgres: {
     host: process.env.POSTGRES_HOST || 'localhost',
     port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-    user: process.env.POSTGRES_USER || 'swiftshare',
-    password: process.env.POSTGRES_PASSWORD || 'swiftshare_secret',
-    database: process.env.POSTGRES_DB || 'swiftshare_db',
+    user: process.env.POSTGRES_USER || 'transora',
+    password: process.env.POSTGRES_PASSWORD || 'transora_secret',
+    database: process.env.POSTGRES_DB || 'transora_db',
     connectionString: process.env.DATABASE_URL,
   },
 
@@ -43,7 +43,7 @@ export const config = {
     localUploadDir: process.env.LOCAL_UPLOAD_DIR || './uploads',
     s3Endpoint: process.env.R2_S3_ENDPOINT,
     s3Region: process.env.AWS_REGION || 'auto',
-    s3Bucket: process.env.R2_BUCKET_NAME || 'swiftshare-bucket',
+    s3Bucket: process.env.R2_BUCKET_NAME || 'transora-bucket',
     s3AccessKeyId: process.env.R2_ACCESS_KEY_ID || '',
     s3SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
   },

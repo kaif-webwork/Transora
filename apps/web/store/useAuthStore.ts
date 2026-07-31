@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User } from '@swiftshare/shared';
+import { User } from '@transora/shared';
 
 interface AuthState {
   user: User | null;
@@ -10,16 +10,16 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: typeof window !== 'undefined' ? localStorage.getItem('swiftshare_token') : null,
+  token: typeof window !== 'undefined' ? localStorage.getItem('transora_token') : null,
   setAuth: (user, token) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('swiftshare_token', token);
+      localStorage.setItem('transora_token', token);
     }
     set({ user, token });
   },
   logout: () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('swiftshare_token');
+      localStorage.removeItem('transora_token');
     }
     set({ user: null, token: null });
   },

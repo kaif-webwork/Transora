@@ -1,27 +1,29 @@
 version: '3.8'
 
 services:
+  # PostgreSQL 16 Primary Database
   postgres:
     image: postgres:16-alpine
-    container_name: swiftshare_postgres
+    container_name: transora_postgres
     restart: always
     environment:
-      POSTGRES_USER: swiftshare
-      POSTGRES_PASSWORD: swiftshare_secret
-      POSTGRES_DB: swiftshare_db
+      POSTGRES_USER: transora
+      POSTGRES_PASSWORD: transora_secret
+      POSTGRES_DB: transora_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U swiftshare -d swiftshare_db"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U transora -d transora_db"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
+  # Redis 7 In-Memory Caching & Real-Time Progress Tracking
   redis:
     image: redis:7-alpine
-    container_name: swiftshare_redis
+    container_name: transora_redis
     restart: always
     ports:
       - "6379:6379"
@@ -29,51 +31,57 @@ services:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
+  # Express + Socket.IO Backend API Service
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: swiftshare_backend
+    container_name: transora_backend
     restart: always
     ports:
       - "4000:4000"
     environment:
-      PORT: 4000
       NODE_ENV: production
+      PORT: 4000
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: swiftshare
-      POSTGRES_PASSWORD: swiftshare_secret
-      POSTGRES_DB: swiftshare_db
+      POSTGRES_USER: transora
+      POSTGRES_PASSWORD: transora_secret
+      POSTGRES_DB: transora_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: swiftshare_super_secret_jwt_key_2026
+      JWT_SECRET: transora_super_secret_jwt_key_2026
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
 
+  # Next.js 15 Web Frontend Application
   web:
     build:
       context: .
       dockerfile: Dockerfile.web
-    container_name: swiftshare_web
+    container_name: transora_web
     restart: always
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://backend:4000
     depends_on:
       - backend
 
+  # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: swiftshare_nginx
+    container_name: transora_nginx
     restart: always
     ports:
       - "80:80"
@@ -87,3 +95,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:

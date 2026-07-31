@@ -1,67 +1,66 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-export function useWebRTC(transferId: string, role: 'sender' | 'receiver') {
-  const [peerConnected, setPeerConnected] = useState(false);
+export function useWebRTC(transferId: string, isSender: boolean) {
+  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   useEffect(() => {
     if (!transferId) return;
 
-    const socket = io('/', { path: '/socket.io' });
-    socketRef.current = socket;
+    const socket: Socket = io('/', { path: '/socket.io' });
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
-    pcRef.current = pc;
+    const configuration: RTCConfiguration = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+    };
 
-    socket.emit('transfer:join', { transferId, role });
+    const pc = new RTCPeerConnection(configuration);
+    peerConnectionRef.current = pc;
 
     pc.onicecandidate = (event) => {
-      if (event.candidate && socketRef.current) {
-        socketRef.current.emit('webrtc:signal', {
-          targetSocketId: transferId,
-          signal: { candidate: event.candidate },
-        });
+      if (event.candidate) {
+        socket.emit('webrtc:signal', { transferId, signal: { candidate: event.candidate } });
       }
     };
 
-    if (role === 'sender') {
-      const dc = pc.createDataChannel('swiftshare_lan');
-      dc.onopen = () => {
-        setPeerConnected(true);
-        setDataChannel(dc);
-      };
-      dc.onclose = () => setPeerConnected(false);
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') setConnectionState('connected');
+      if (pc.connectionState === 'failed') setConnectionState('failed');
+    };
+
+    if (isSender) {
+      const dc = pc.createDataChannel('transora_lan');
+      dc.binaryType = 'arraybuffer';
+      dc.onopen = () => setConnectionState('connected');
+      setDataChannel(dc);
+
+      pc.createOffer().then((offer) => {
+        pc.setLocalDescription(offer);
+        socket.emit('webrtc:signal', { transferId, signal: { offer } });
+      });
     } else {
       pc.ondatachannel = (event) => {
         const dc = event.channel;
-        dc.onopen = () => {
-          setPeerConnected(true);
-          setDataChannel(dc);
-        };
-        dc.onclose = () => setPeerConnected(false);
+        dc.binaryType = 'arraybuffer';
+        dc.onopen = () => setConnectionState('connected');
+        setDataChannel(dc);
       };
     }
 
-    socket.on('receiver:joined', async () => {
-      if (role === 'sender') {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit('webrtc:signal', { targetSocketId: transferId, signal: { offer } });
-      }
-    });
+    socket.emit('transfer:join', { transferId, role: isSender ? 'sender' : 'receiver' });
 
-    socket.on('webrtc:signal', async ({ signal }) => {
-      if (signal.offer) {
+    socket.on('webrtc:signal', async (data: { signal: any }) => {
+      const { signal } = data;
+      if (signal.offer && !isSender) {
         await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        socket.emit('webrtc:signal', { targetSocketId: transferId, signal: { answer } });
-      } else if (signal.answer) {
+        socket.emit('webrtc:signal', { transferId, signal: { answer } });
+      } else if (signal.answer && isSender) {
         await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
       } else if (signal.candidate) {
         await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
@@ -69,10 +68,10 @@ export function useWebRTC(transferId: string, role: 'sender' | 'receiver') {
     });
 
     return () => {
-      socket.disconnect();
       pc.close();
+      socket.disconnect();
     };
-  }, [transferId, role]);
+  }, [transferId, isSender]);
 
-  return { peerConnected, dataChannel };
+  return { connectionState, dataChannel };
 }
