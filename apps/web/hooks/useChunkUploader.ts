@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTransferStore } from '../store/useTransferStore';
+import { getBackendApiUrl } from '../lib/api';
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
 const PARALLEL_WORKERS = 6; // 6 Parallel Multi-Lane Workers for Ultra-Fast Speed
@@ -48,9 +49,9 @@ export function useChunkUploader() {
         })
       );
 
-      // 2. Initialize transfer with backend (tries relative route and backend URL)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/init` : '/api/v1/init';
-      const initRes = await fetch(apiUrl, {
+      // 2. Initialize transfer with backend
+      const initUrl = getBackendApiUrl('/api/v1/init');
+      const initRes = await fetch(initUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -68,7 +69,11 @@ export function useChunkUploader() {
         initData = await initRes.json().catch(() => ({}));
       } else {
         const text = await initRes.text().catch(() => '');
-        throw new Error(`Backend response error (HTTP ${initRes.status}): ${text.substring(0, 100) || 'Invalid server response'}`);
+        throw new Error(
+          !process.env.NEXT_PUBLIC_API_URL && typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+            ? 'Vercel Deployment Notice: Please set NEXT_PUBLIC_API_URL in your Vercel Project Environment Variables to point to your live backend server URL (e.g., https://your-backend.up.railway.app)'
+            : `Backend response error (HTTP ${initRes.status}): ${text.substring(0, 100) || 'Invalid server response'}`
+        );
       }
 
       if (!initRes.ok) {
@@ -106,9 +111,7 @@ export function useChunkUploader() {
 
           while (!success && retries > 0) {
             try {
-              const chunkUrl = process.env.NEXT_PUBLIC_API_URL
-                ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`
-                : `/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`;
+              const chunkUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`);
 
               const uploadRes = await fetch(chunkUrl, {
                 method: 'POST',

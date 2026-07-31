@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getBackendApiUrl } from '../lib/api';
 
 const PARALLEL_DOWNLOAD_WORKERS = 6; // 6 Parallel HTTP GET Download Lanes
 
@@ -29,7 +30,8 @@ export function useProgressiveDownloader() {
 
         while (!downloaded && retries > 0) {
           try {
-            const res = await fetch(`/api/v1/transfers/${transferId}/files/${fileId}/chunks/${chunkIndex}`);
+            const chunkUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${fileId}/chunks/${chunkIndex}`);
+            const res = await fetch(chunkUrl);
             if (res.ok) {
               const blob = await res.blob();
               chunkBlobs[chunkIndex] = blob;
