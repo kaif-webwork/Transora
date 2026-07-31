@@ -51,28 +51,30 @@ export function useChunkUploader() {
 
       // 2. Initialize transfer with backend
       const initUrl = getBackendApiUrl('/api/v1/init');
-      const initRes = await fetch(initUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: files.length === 1 ? files[0].name : `${files.length} Files Transfer`,
-          expiryType: options.expiryType || '24_HOURS',
-          password: options.password || undefined,
-          transferMode: options.transferMode || 'CLOUD_CHUNK',
-          files: fileSpecs,
-        }),
-      });
+      let initRes: Response;
+      try {
+        initRes = await fetch(initUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: files.length === 1 ? files[0].name : `${files.length} Files Transfer`,
+            expiryType: options.expiryType || '24_HOURS',
+            password: options.password || undefined,
+            transferMode: options.transferMode || 'CLOUD_CHUNK',
+            files: fileSpecs,
+          }),
+        });
+      } catch (networkErr: any) {
+        throw new Error(`Cannot connect to Backend Server. Please verify Backend URL in Settings.`);
+      }
 
       const contentType = initRes.headers.get('content-type') || '';
       let initData: any = {};
       if (contentType.includes('application/json')) {
         initData = await initRes.json().catch(() => ({}));
       } else {
-        const text = await initRes.text().catch(() => '');
         throw new Error(
-          !process.env.NEXT_PUBLIC_API_URL && typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
-            ? 'Vercel Deployment Notice: Please set NEXT_PUBLIC_API_URL in your Vercel Project Environment Variables to point to your live backend server URL (e.g., https://your-backend.up.railway.app)'
-            : `Backend response error (HTTP ${initRes.status}): ${text.substring(0, 100) || 'Invalid server response'}`
+          'Backend Server URL Missing / Unreachable: Vercel frontend needs a live Backend URL (e.g. Railway URL). Please set NEXT_PUBLIC_API_URL in Vercel settings or enter backend URL in Transora Settings tab.'
         );
       }
 
