@@ -14,6 +14,10 @@
     "test": "jest",
     "lint": "eslint . --ext .ts,.tsx"
   },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2",
     "typescript": "^5.9.3"
