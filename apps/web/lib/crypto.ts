@@ -13,7 +13,7 @@ export async function deriveEncryptionKey(passphrase: string, salt: string): Pro
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: encoder.encode(salt),
+      salt: encoder.encode(salt) as any,
       iterations: 100000,
       hash: 'SHA-256',
     },
@@ -29,7 +29,7 @@ export async function encryptChunk(chunkBuffer: ArrayBuffer, key: CryptoKey): Pr
   const encryptedBuffer = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv,
+      iv: iv as any,
     },
     key,
     chunkBuffer
@@ -42,7 +42,7 @@ export async function decryptChunk(encryptedBuffer: ArrayBuffer, key: CryptoKey,
   return crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
-      iv,
+      iv: iv as any,
     },
     key,
     encryptedBuffer
