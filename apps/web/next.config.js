@@ -3,7 +3,13 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@transora/shared'],
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    let backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+      backendUrl = `https://${backendUrl}`;
+    }
+    // Clean trailing slash
+    backendUrl = backendUrl.replace(/\/$/, '');
+
     return [
       {
         source: '/api/:path*',
