@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "dev": "npx concurrently \"npm run dev --workspace=services/backend\" \"npm run dev --workspace=apps/web\"",
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/web",
     "test": "jest",
     "lint": "eslint . --ext .ts,.tsx"
   },
