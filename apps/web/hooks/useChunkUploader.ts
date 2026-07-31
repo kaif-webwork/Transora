@@ -48,8 +48,9 @@ export function useChunkUploader() {
         })
       );
 
-      // 2. Initialize transfer with backend
-      const initRes = await fetch('/api/v1/init', {
+      // 2. Initialize transfer with backend (tries relative route and backend URL)
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/init` : '/api/v1/init';
+      const initRes = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -61,9 +62,17 @@ export function useChunkUploader() {
         }),
       });
 
-      const initData = await initRes.json();
+      const contentType = initRes.headers.get('content-type') || '';
+      let initData: any = {};
+      if (contentType.includes('application/json')) {
+        initData = await initRes.json().catch(() => ({}));
+      } else {
+        const text = await initRes.text().catch(() => '');
+        throw new Error(`Backend response error (HTTP ${initRes.status}): ${text.substring(0, 100) || 'Invalid server response'}`);
+      }
+
       if (!initRes.ok) {
-        throw new Error(initData.error || 'Failed to initialize upload session');
+        throw new Error(initData.error || `Transfer initialization failed (HTTP ${initRes.status})`);
       }
 
       const { transferId, shareCode, shareUrl, files: createdFiles } = initData;
@@ -97,14 +106,15 @@ export function useChunkUploader() {
 
           while (!success && retries > 0) {
             try {
-              const uploadRes = await fetch(
-                `/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`,
-                {
-                  method: 'POST',
-                  headers: { 'x-checksum-sha256': sha256Checksum },
-                  body: formData,
-                }
-              );
+              const chunkUrl = process.env.NEXT_PUBLIC_API_URL
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`
+                : `/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`;
+
+              const uploadRes = await fetch(chunkUrl, {
+                method: 'POST',
+                headers: { 'x-checksum-sha256': sha256Checksum },
+                body: formData,
+              });
 
               if (uploadRes.ok) {
                 success = true;

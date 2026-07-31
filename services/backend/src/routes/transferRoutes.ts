@@ -10,7 +10,10 @@ const upload = multer({
 
 const router = Router();
 
+// Support both /api/v1/init and /api/v1/transfers/init
 router.post('/init', authMiddleware, TransferController.initTransfer);
+router.post('/transfers/init', authMiddleware, TransferController.initTransfer);
+
 router.post('/transfers/:transferId/files/:fileId/chunks/:chunkIndex', upload.single('chunk'), TransferController.uploadChunk);
 router.get('/share/:shareCode', TransferController.getShareLink);
 router.get('/transfers/:transferId/files/:fileId/chunks/:chunkIndex', TransferController.downloadChunk);
