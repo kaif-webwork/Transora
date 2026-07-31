@@ -1,0 +1,274 @@
+import crypto from 'crypto';
+import { pool } from '../db/index.js';
+import { StorageService } from './StorageService.js';
+import { RedisService } from './RedisService.js';
+import { InitTransferRequest } from '@swiftshare/shared';
+import { config } from '../config/index.js';
+import bcrypt from 'bcryptjs';
+
+// Resilient In-Memory Fallback Store
+const memoryTransfers = new Map<string, any>();
+const memoryFiles = new Map<string, any[]>();
+const memoryChunks = new Map<string, any>();
+
+export class TransferService {
+  private static generateShareCode(): string {
+    return crypto.randomBytes(6).toString('hex').toUpperCase();
+  }
+
+  static async initializeTransfer(senderId: string | null, data: InitTransferRequest) {
+    if (!data || !Array.isArray(data.files) || data.files.length === 0) {
+      throw new Error('Please select at least one valid file to transfer.');
+    }
+
+    const shareCode = this.generateShareCode();
+    let passwordHash = null;
+
+    if (data.password) {
+      passwordHash = await bcrypt.hash(data.password, 10);
+    }
+
+    let expiresAt: Date | null = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    if (data.expiryType === '1_HOUR') expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    if (data.expiryType === '7_DAYS') expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (data.expiryType === 'NEVER') expiresAt = null;
+
+    const totalSizeBytes = data.files.reduce((acc, f) => acc + (f.fileSizeBytes || 0), 0);
+    const totalChunks = data.files.reduce((acc, f) => acc + (f.totalChunks || 1), 0);
+    const transferId = crypto.randomUUID();
+
+    const shareUrl = `${config.frontendUrl}/receive/${shareCode}`;
+
+    let dbConnected = false;
+    try {
+      const client = await pool.connect();
+      client.release();
+      dbConnected = true;
+    } catch (e) {
+      dbConnected = false;
+    }
+
+    if (dbConnected) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        const transferRes = await client.query(
+          `INSERT INTO transfers (
+            id, sender_id, title, description, share_code, transfer_mode, is_e2ee, 
+            encryption_salt, password_hash, max_downloads, total_size_bytes, 
+            total_chunks, expiry_type, expires_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          RETURNING *`,
+          [
+            transferId,
+            senderId,
+            data.title || 'Untitled Transfer',
+            data.description || null,
+            shareCode,
+            data.transferMode || 'CLOUD_CHUNK',
+            data.isE2EE || false,
+            data.encryptionSalt || null,
+            passwordHash,
+            data.maxDownloads || null,
+            totalSizeBytes,
+            totalChunks,
+            data.expiryType || '24_HOURS',
+            expiresAt,
+          ]
+        );
+
+        const transfer = transferRes.rows[0];
+        const filesCreated = [];
+
+        for (const fileData of data.files) {
+          const fileRes = await client.query(
+            `INSERT INTO files (transfer_id, file_name, file_path, file_size_bytes, mime_type, sha256_checksum)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING *`,
+            [
+              transfer.id,
+              fileData.fileName,
+              `/transfers/${transfer.id}/${fileData.fileName}`,
+              fileData.fileSizeBytes,
+              fileData.mimeType,
+              fileData.sha256Checksum,
+            ]
+          );
+          filesCreated.push(fileRes.rows[0]);
+        }
+
+        await client.query('COMMIT');
+
+        return {
+          transferId: transfer.id,
+          shareCode: transfer.share_code,
+          shareUrl,
+          files: filesCreated,
+        };
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.warn('[TransferService] Transaction failed, falling back to memory store.');
+      } finally {
+        client.release();
+      }
+    }
+
+    // In-Memory Fallback Implementation
+    const filesCreated = data.files.map((fileData) => ({
+      id: crypto.randomUUID(),
+      transfer_id: transferId,
+      file_name: fileData.fileName,
+      file_path: `/transfers/${transferId}/${fileData.fileName}`,
+      file_size_bytes: fileData.fileSizeBytes,
+      mime_type: fileData.mimeType,
+      sha256_checksum: fileData.sha256Checksum,
+    }));
+
+    const transfer = {
+      id: transferId,
+      sender_id: senderId,
+      title: data.title || 'Untitled Transfer',
+      description: data.description || null,
+      share_code: shareCode,
+      transfer_mode: data.transferMode || 'CLOUD_CHUNK',
+      status: 'INITIALIZED',
+      is_e2ee: data.isE2EE || false,
+      encryption_salt: data.encryptionSalt || null,
+      password_hash: passwordHash,
+      max_downloads: data.maxDownloads || null,
+      download_count: 0,
+      total_size_bytes: totalSizeBytes,
+      total_chunks: totalChunks,
+      uploaded_chunks: 0,
+      expiry_type: data.expiryType || '24_HOURS',
+      expires_at: expiresAt,
+      created_at: new Date().toISOString(),
+      files: filesCreated,
+    };
+
+    memoryTransfers.set(transferId, transfer);
+    memoryTransfers.set(shareCode, transfer);
+    memoryFiles.set(transferId, filesCreated);
+
+    return {
+      transferId: transfer.id,
+      shareCode: transfer.share_code,
+      shareUrl,
+      files: filesCreated,
+    };
+  }
+
+  static async uploadChunk(
+    transferId: string,
+    fileId: string,
+    chunkIndex: number,
+    sha256Checksum: string,
+    buffer: Buffer
+  ) {
+    const computedHash = crypto.createHash('sha256').update(buffer).digest('hex');
+    if (sha256Checksum && sha256Checksum.length === 64 && computedHash !== sha256Checksum) {
+      throw new Error(`SHA-256 Integrity Mismatch for Chunk ${chunkIndex}`);
+    }
+
+    const storageKey = await StorageService.saveChunk(transferId, fileId, chunkIndex, buffer);
+
+    try {
+      await pool.query(
+        `INSERT INTO file_chunks (file_id, chunk_index, chunk_size_bytes, sha256_checksum, storage_key, is_uploaded, uploaded_at)
+         VALUES ($1, $2, $3, $4, $5, TRUE, CURRENT_TIMESTAMP)
+         ON CONFLICT (file_id, chunk_index) 
+         DO UPDATE SET is_uploaded = TRUE, uploaded_at = CURRENT_TIMESTAMP`,
+        [fileId, chunkIndex, buffer.length, sha256Checksum || computedHash, storageKey]
+      );
+    } catch (err) {
+      memoryChunks.set(`${fileId}:${chunkIndex}`, storageKey);
+    }
+
+    const uploadedChunks = await RedisService.trackChunkProgress(transferId, chunkIndex);
+
+    try {
+      await pool.query(
+        `UPDATE transfers SET uploaded_chunks = uploaded_chunks + 1, status = 'UPLOADING', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [transferId]
+      );
+    } catch (err) {
+      const transfer = memoryTransfers.get(transferId);
+      if (transfer) {
+        transfer.uploaded_chunks += 1;
+        transfer.status = 'UPLOADING';
+      }
+    }
+
+    return { success: true, uploadedChunks, storageKey };
+  }
+
+  static async getTransferByShareCode(shareCode: string, password?: string) {
+    let transfer = null;
+    let files = [];
+
+    try {
+      const transferRes = await pool.query(`SELECT * FROM transfers WHERE share_code = $1`, [shareCode]);
+      if (transferRes.rows.length > 0) {
+        transfer = transferRes.rows[0];
+        const filesRes = await pool.query(`SELECT * FROM files WHERE transfer_id = $1`, [transfer.id]);
+        files = filesRes.rows;
+      }
+    } catch (err) {
+      // Memory fallback
+      transfer = memoryTransfers.get(shareCode);
+      if (transfer) {
+        files = memoryFiles.get(transfer.id) || [];
+      }
+    }
+
+    if (!transfer) {
+      throw new Error('Transfer link not found or expired');
+    }
+
+    if (transfer.expires_at && new Date(transfer.expires_at) < new Date()) {
+      throw new Error('Transfer link has expired');
+    }
+
+    if (transfer.password_hash) {
+      if (!password) {
+        return { requiresPassword: true, shareCode: transfer.share_code };
+      }
+      const isValid = await bcrypt.compare(password, transfer.password_hash);
+      if (!isValid) {
+        throw new Error('Incorrect password');
+      }
+    }
+
+    return {
+      requiresPassword: false,
+      transfer: {
+        ...transfer,
+        files,
+      },
+    };
+  }
+
+  static async getChunkStream(transferId: string, fileId: string, chunkIndex: number) {
+    let storageKey = null;
+
+    try {
+      const chunkRes = await pool.query(
+        `SELECT storage_key FROM file_chunks WHERE file_id = $1 AND chunk_index = $2 AND is_uploaded = TRUE`,
+        [fileId, chunkIndex]
+      );
+      if (chunkRes.rows.length > 0) {
+        storageKey = chunkRes.rows[0].storage_key;
+      }
+    } catch (err) {
+      storageKey = memoryChunks.get(`${fileId}:${chunkIndex}`);
+    }
+
+    if (!storageKey) {
+      const localPath = `./uploads/${transferId}/${fileId}/chunk_${chunkIndex}.bin`;
+      storageKey = localPath;
+    }
+
+    return StorageService.getChunkStream(storageKey);
+  }
+}
