@@ -8,6 +8,10 @@ import crypto from 'crypto';
 const memoryUsers = new Map<string, any>();
 
 export class AuthService {
+  static verifyToken(token: string): any {
+    return jwt.verify(token, config.jwtSecret);
+  }
+
   static async registerUser(email: string, passwordHash: string, fullName: string) {
     let dbConnected = false;
     try {
@@ -35,7 +39,7 @@ export class AuthService {
         const token = jwt.sign(
           { userId: user.id, email: user.email, role: user.role },
           config.jwtSecret,
-          { expiresIn: config.jwtExpiresIn }
+          { expiresIn: '7d' } as jwt.SignOptions
         );
         return { user, token };
       } catch (err: any) {
@@ -61,7 +65,7 @@ export class AuthService {
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       config.jwtSecret,
-      { expiresIn: config.jwtExpiresIn }
+      { expiresIn: '7d' } as jwt.SignOptions
     );
     return { user, token };
   }
@@ -94,7 +98,7 @@ export class AuthService {
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       config.jwtSecret,
-      { expiresIn: config.jwtExpiresIn }
+      { expiresIn: '7d' } as jwt.SignOptions
     );
 
     return {
