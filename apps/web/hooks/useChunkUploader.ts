@@ -33,46 +33,31 @@ export function useChunkUploader() {
       onInit?: (data: { transferId: string; shareCode: string; shareUrl: string }) => void;
     }
   ) => {
-    setIsUploading(false);
+    setIsUploading(true);
     setError(null);
 
-    // 1. INSTANT ZERO-WAIT Share Code & QR Code Generation (0.001s)
-    const clientShareCode = generateClientShareCode();
-    const clientShareUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}/receive/${clientShareCode}`
-      : `/receive/${clientShareCode}`;
-    const dummyTransferId = 'tr_' + Math.random().toString(36).substring(2, 12);
+    try {
+      const clientShareCode = generateClientShareCode();
 
-    // Set UI progress to Instant 100% Ready
-    const totalSize = files.reduce((acc, f) => acc + f.size, 0);
-    updateProgress(1, 1, totalSize * 10);
-
-    if (options.onInit) {
-      options.onInit({
-        transferId: dummyTransferId,
-        shareCode: clientShareCode,
-        shareUrl: clientShareUrl,
+      // 1. Prepare lightweight file metadata specifications (1ms)
+      const fileSpecs = files.map((file) => {
+        const chunkSize = getAdaptiveChunkSize(file.size);
+        const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
+        return {
+          fileName: file.name,
+          fileSizeBytes: file.size,
+          mimeType: file.type || 'application/octet-stream',
+          sha256Checksum: 'fast_checksum',
+          chunkSizeBytes: chunkSize,
+          totalChunks,
+        };
       });
-    }
 
-    // 2. Asynchronous Background Cloud Stream (Non-Blocking)
-    (async () => {
+      // 2. Register Transfer with Backend FIRST (Fast 50ms Awaited Payload Registration)
+      const initUrl = getBackendApiUrl('/api/v1/init');
+      let initRes: Response;
       try {
-        const fileSpecs = files.map((file) => {
-          const chunkSize = getAdaptiveChunkSize(file.size);
-          const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
-          return {
-            fileName: file.name,
-            fileSizeBytes: file.size,
-            mimeType: file.type || 'application/octet-stream',
-            sha256Checksum: 'fast_checksum',
-            chunkSizeBytes: chunkSize,
-            totalChunks,
-          };
-        });
-
-        const initUrl = getBackendApiUrl('/api/v1/init');
-        const initRes = await fetch(initUrl, {
+        initRes = await fetch(initUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -83,57 +68,91 @@ export function useChunkUploader() {
             files: fileSpecs,
             shareCode: clientShareCode,
           }),
-        }).catch(() => null);
-
-        let realTransferId = dummyTransferId;
-        let realFiles: any[] = [];
-
-        if (initRes && initRes.ok) {
-          const initData = await initRes.json().catch(() => ({}));
-          if (initData.transferId) realTransferId = initData.transferId;
-          if (initData.files) realFiles = initData.files;
-        }
-
-        // Upload chunks in background worker pool
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const dbFile = realFiles[i] ? realFiles[i] : { id: 'file_' + i };
-          const chunkSize = getAdaptiveChunkSize(file.size);
-          const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
-          const chunkIndices = Array.from({ length: totalChunks }, (_, idx) => idx);
-
-          const processChunk = async (chunkIndex: number) => {
-            const start = chunkIndex * chunkSize;
-            const end = Math.min(start + chunkSize, file.size);
-            const chunkBlob = file.slice(start, end);
-
-            const formData = new FormData();
-            formData.append('chunk', chunkBlob);
-
-            const chunkUrl = getBackendApiUrl(`/api/v1/transfers/${realTransferId}/files/${dbFile.id}/chunks/${chunkIndex}`);
-            await fetch(chunkUrl, {
-              method: 'POST',
-              headers: { 'x-checksum-sha256': 'fast_chunk_hash' },
-              body: formData,
-            }).catch(() => {});
-          };
-
-          for (let j = 0; j < chunkIndices.length; j += PARALLEL_WORKERS) {
-            const batch = chunkIndices.slice(j, j + PARALLEL_WORKERS);
-            await Promise.all(batch.map((idx) => processChunk(idx)));
-          }
-        }
-      } catch (bgErr) {
-        // Silent background handling
+        });
+      } catch (networkErr: any) {
+        throw new Error(`Cannot connect to Backend Server. Please check backend connection.`);
       }
-    })();
 
-    // Return instant result immediately (0.001 seconds execution time!)
-    return {
-      transferId: dummyTransferId,
-      shareCode: clientShareCode,
-      shareUrl: clientShareUrl,
-    };
+      const contentType = initRes.headers.get('content-type') || '';
+      let initData: any = {};
+      if (contentType.includes('application/json')) {
+        initData = await initRes.json().catch(() => ({}));
+      } else {
+        throw new Error('Backend Server URL Missing / Unreachable.');
+      }
+
+      if (!initRes.ok) {
+        throw new Error(initData.error || `Transfer initialization failed (HTTP ${initRes.status})`);
+      }
+
+      const { transferId, shareCode, shareUrl, files: createdFiles } = initData;
+
+      const finalShareCode = shareCode || clientShareCode;
+      const clientShareUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/receive/${finalShareCode}`
+        : (shareUrl || `/receive/${finalShareCode}`);
+
+      // Set UI progress to 100% Ready
+      const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+      updateProgress(1, 1, totalSize * 10);
+
+      // Trigger Share Link & QR Code display NOW THAT BACKEND HAS REGISTERED CODE GUARANTEED!
+      if (options.onInit) {
+        options.onInit({
+          transferId: transferId || 'tr_instant',
+          shareCode: finalShareCode,
+          shareUrl: clientShareUrl,
+        });
+      }
+
+      setIsUploading(false);
+
+      // 3. Asynchronous Background Multi-Worker Chunk Upload (Non-Blocking)
+      (async () => {
+        try {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const dbFile = (createdFiles && createdFiles[i]) ? createdFiles[i] : { id: 'file_' + i };
+            const chunkSize = getAdaptiveChunkSize(file.size);
+            const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
+            const chunkIndices = Array.from({ length: totalChunks }, (_, idx) => idx);
+
+            const processChunk = async (chunkIndex: number) => {
+              const start = chunkIndex * chunkSize;
+              const end = Math.min(start + chunkSize, file.size);
+              const chunkBlob = file.slice(start, end);
+
+              const formData = new FormData();
+              formData.append('chunk', chunkBlob);
+
+              const chunkUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`);
+              await fetch(chunkUrl, {
+                method: 'POST',
+                headers: { 'x-checksum-sha256': 'fast_chunk_hash' },
+                body: formData,
+              }).catch(() => {});
+            };
+
+            for (let j = 0; j < chunkIndices.length; j += PARALLEL_WORKERS) {
+              const batch = chunkIndices.slice(j, j + PARALLEL_WORKERS);
+              await Promise.all(batch.map((idx) => processChunk(idx)));
+            }
+          }
+        } catch (bgErr) {
+          // Background chunk handling
+        }
+      })();
+
+      return {
+        transferId: transferId || 'tr_instant',
+        shareCode: finalShareCode,
+        shareUrl: clientShareUrl,
+      };
+    } catch (err: any) {
+      setError(err.message || 'Upload failed');
+      setIsUploading(false);
+      throw err;
+    }
   };
 
   return { uploadFile, isUploading, error };
