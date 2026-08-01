@@ -57,7 +57,7 @@ app.use('/api/v1', transferRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
 // Health Check Endpoint
-app.get('/health', (req, res) => {
+app.get(['/health', '/api/v1/health'], (req, res) => {
   res.json({ status: 'ok', service: 'Transora Backend', timestamp: new Date().toISOString() });
 });
 

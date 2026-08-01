@@ -33,25 +33,25 @@ export default function ReceivePage() {
       let res: Response | null = null;
       let lastErr: any = null;
 
-      for (const endpoint of endpoints) {
-        try {
-          const tempRes = await fetch(endpoint);
-          if (tempRes && tempRes.ok) {
-            res = tempRes;
-            break;
+      // 4 Retries with backoff delay to handle Render cold-start wakeups smoothly
+      for (let attempt = 0; attempt < 4; attempt++) {
+        for (const endpoint of endpoints) {
+          try {
+            const tempRes = await fetch(endpoint);
+            if (tempRes && (tempRes.ok || tempRes.status === 400 || tempRes.status === 401 || tempRes.status === 404)) {
+              res = tempRes;
+              break;
+            }
+          } catch (e) {
+            lastErr = e;
           }
-          if (tempRes && (tempRes.status === 400 || tempRes.status === 401)) {
-            res = tempRes;
-            break;
-          }
-          res = tempRes;
-        } catch (e) {
-          lastErr = e;
         }
+        if (res) break;
+        await new Promise((r) => setTimeout(r, 1200));
       }
 
       if (!res) {
-        throw new Error(lastErr?.message || 'Cannot connect to Backend Server. Network fetch failed.');
+        throw new Error('Server connection is waking up. Please click Retry Connection.');
       }
 
       const contentType = res.headers.get('content-type') || '';
@@ -135,6 +135,12 @@ export default function ReceivePage() {
           </div>
           <h3 className="text-xl font-bold text-white">Transfer Unavailable</h3>
           <p className="text-sm text-slate-400">{error}</p>
+          <button
+            onClick={() => fetchTransferInfo()}
+            className="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs transition shadow-md"
+          >
+            Retry Connection
+          </button>
         </div>
       ) : requiresPassword ? (
         <form onSubmit={handlePasswordSubmit} className="glass-panel rounded-3xl p-8 space-y-6">
