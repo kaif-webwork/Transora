@@ -278,4 +278,62 @@ export class TransferService {
 
     return StorageService.getChunkStream(storageKey);
   }
+
+  static async downloadFile(transferId: string, fileId: string, res: any) {
+    let file: any = null;
+    const filesList = memoryFiles.get(transferId) || [];
+    file = filesList.find((f: any) => f.id === fileId);
+
+    if (!file && isPostgresAvailable) {
+      try {
+        const fileRes = await pool.query(`SELECT * FROM files WHERE id = $1`, [fileId]);
+        if (fileRes.rows.length > 0) {
+          file = fileRes.rows[0];
+        }
+      } catch (err) {}
+    }
+
+    const fileName = file ? (file.file_name || file.fileName || 'downloaded_file') : 'downloaded_file';
+    const fileSizeBytes = file ? (file.file_size_bytes || file.fileSizeBytes || 0) : 0;
+    const mimeType = file ? (file.mime_type || file.mimeType || 'application/octet-stream') : 'application/octet-stream';
+
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader('Content-Type', mimeType);
+    if (fileSizeBytes > 0) {
+      res.setHeader('Content-Length', fileSizeBytes.toString());
+    }
+
+    const chunkSize = fileSizeBytes > 0 ? (
+      fileSizeBytes < 50 * 1024 * 1024 ? 4 * 1024 * 1024 :
+      fileSizeBytes < 500 * 1024 * 1024 ? 8 * 1024 * 1024 : 16 * 1024 * 1024
+    ) : 4 * 1024 * 1024;
+
+    const totalChunks = fileSizeBytes > 0 ? Math.max(1, Math.ceil(fileSizeBytes / chunkSize)) : 1;
+
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      let storageKey = memoryChunks.get(`${fileId}:${chunkIndex}`) || memoryChunks.get(`${transferId}:${fileId}:${chunkIndex}`);
+
+      if (!storageKey) {
+        const dir = path.join(config.storage.localUploadDir, transferId, fileId);
+        storageKey = path.join(dir, `chunk_${chunkIndex}.bin`);
+      }
+
+      let attempts = 20;
+      while (!fs.existsSync(storageKey) && attempts > 0) {
+        await new Promise((r) => setTimeout(r, 500));
+        attempts--;
+      }
+
+      if (fs.existsSync(storageKey)) {
+        const chunkStream = fs.createReadStream(storageKey, { highWaterMark: 1024 * 1024 });
+        await new Promise((resolve) => {
+          chunkStream.pipe(res, { end: false });
+          chunkStream.on('end', () => resolve(true));
+          chunkStream.on('error', () => resolve(false));
+        });
+      }
+    }
+
+    res.end();
+  }
 }

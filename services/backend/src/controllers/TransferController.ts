@@ -79,4 +79,13 @@ export class TransferController {
       return res.status(404).json({ error: err.message || 'Chunk download failed' });
     }
   }
+
+  static async downloadFile(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { transferId, fileId } = req.params;
+      await TransferService.downloadFile(transferId, fileId, res);
+    } catch (err: any) {
+      return res.status(404).json({ error: err.message || 'File download failed' });
+    }
+  }
 }

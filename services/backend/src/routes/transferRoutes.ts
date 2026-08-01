@@ -17,5 +17,6 @@ router.post('/transfers/init', authMiddleware, TransferController.initTransfer);
 router.post('/transfers/:transferId/files/:fileId/chunks/:chunkIndex', upload.single('chunk'), TransferController.uploadChunk);
 router.get('/share/:shareCode', TransferController.getShareLink);
 router.get('/transfers/:transferId/files/:fileId/chunks/:chunkIndex', TransferController.downloadChunk);
+router.get('/transfers/:transferId/files/:fileId/download', TransferController.downloadFile);
 
 export default router;
