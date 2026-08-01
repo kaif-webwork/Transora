@@ -376,13 +376,20 @@ export class TransferService {
         storageKey = path.join(dir, `chunk_${chunkIndex}.bin`);
       }
 
-      let attempts = 20;
+      let attempts = 4;
       while (!fs.existsSync(storageKey) && attempts > 0 && !clientDisconnected) {
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 250));
         attempts--;
       }
 
       if (clientDisconnected || res.destroyed || res.writableEnded) {
+        break;
+      }
+
+      if (!fs.existsSync(storageKey) && chunkIndex === 0) {
+        if (!res.headersSent) {
+          res.status(404).json({ error: 'File chunks unavailable or transfer expired' });
+        }
         break;
       }
 
