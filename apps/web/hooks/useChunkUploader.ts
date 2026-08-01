@@ -92,9 +92,9 @@ export function useChunkUploader() {
         ? `${window.location.origin}/receive/${finalShareCode}`
         : (shareUrl || `/receive/${finalShareCode}`);
 
-      // Set UI progress to 100% Ready
+      // Set UI progress to 5% Initialized
       const totalSize = files.reduce((acc, f) => acc + f.size, 0);
-      updateProgress(1, 1, totalSize * 10);
+      updateProgress(1, 1, 5);
 
       // Trigger Share Link & QR Code display NOW THAT BACKEND HAS REGISTERED CODE GUARANTEED!
       if (options.onInit) {
@@ -105,43 +105,65 @@ export function useChunkUploader() {
         });
       }
 
-      setIsUploading(false);
+      // 3. Sequential & Parallel Chunk Upload to Backend
+      let totalChunksUploaded = 0;
+      let totalChunksOverall = 0;
+      for (const file of files) {
+        const chunkSize = getAdaptiveChunkSize(file.size);
+        totalChunksOverall += Math.max(1, Math.ceil(file.size / chunkSize));
+      }
 
-      // 3. Asynchronous Background Multi-Worker Chunk Upload (Non-Blocking)
-      (async () => {
-        try {
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const dbFile = (createdFiles && createdFiles[i]) ? createdFiles[i] : { id: 'file_' + i };
-            const chunkSize = getAdaptiveChunkSize(file.size);
-            const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
-            const chunkIndices = Array.from({ length: totalChunks }, (_, idx) => idx);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const dbFile = (createdFiles && createdFiles[i]) ? createdFiles[i] : { id: 'file_' + i };
+        const chunkSize = getAdaptiveChunkSize(file.size);
+        const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
+        const chunkIndices = Array.from({ length: totalChunks }, (_, idx) => idx);
 
-            const processChunk = async (chunkIndex: number) => {
-              const start = chunkIndex * chunkSize;
-              const end = Math.min(start + chunkSize, file.size);
-              const chunkBlob = file.slice(start, end);
+        const processChunk = async (chunkIndex: number) => {
+          const start = chunkIndex * chunkSize;
+          const end = Math.min(start + chunkSize, file.size);
+          const chunkBlob = file.slice(start, end);
 
-              const formData = new FormData();
-              formData.append('chunk', chunkBlob);
+          const formData = new FormData();
+          formData.append('chunk', chunkBlob);
 
-              const chunkUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`);
-              await fetch(chunkUrl, {
+          const chunkUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${dbFile.id}/chunks/${chunkIndex}`);
+          let retries = 3;
+          let uploaded = false;
+
+          while (!uploaded && retries > 0) {
+            try {
+              const res = await fetch(chunkUrl, {
                 method: 'POST',
                 headers: { 'x-checksum-sha256': 'fast_chunk_hash' },
                 body: formData,
-              }).catch(() => {});
-            };
-
-            for (let j = 0; j < chunkIndices.length; j += PARALLEL_WORKERS) {
-              const batch = chunkIndices.slice(j, j + PARALLEL_WORKERS);
-              await Promise.all(batch.map((idx) => processChunk(idx)));
+              });
+              if (res.ok) {
+                uploaded = true;
+              } else {
+                retries--;
+                if (retries > 0) await new Promise((r) => setTimeout(r, 500));
+              }
+            } catch (e) {
+              retries--;
+              if (retries > 0) await new Promise((r) => setTimeout(r, 500));
             }
           }
-        } catch (bgErr) {
-          // Background chunk handling
+
+          totalChunksUploaded++;
+          const percent = Math.min(99, Math.round((totalChunksUploaded / totalChunksOverall) * 100));
+          updateProgress(totalChunksUploaded, totalChunksOverall, Math.round((percent / 100) * totalSize));
+        };
+
+        for (let j = 0; j < chunkIndices.length; j += PARALLEL_WORKERS) {
+          const batch = chunkIndices.slice(j, j + PARALLEL_WORKERS);
+          await Promise.all(batch.map((idx) => processChunk(idx)));
         }
-      })();
+      }
+
+      updateProgress(totalChunksOverall, totalChunksOverall, totalSize);
+      setIsUploading(false);
 
       return {
         transferId: transferId || 'tr_instant',

@@ -29,33 +29,31 @@ export function useProgressiveDownloader() {
     const totalChunks = Math.max(1, Math.ceil(validSize / chunkSize));
 
     try {
-      // For large files (> 1GB), use hidden iframe to stream directly without memory overload or page redirect
-      if (validSize > 1024 * 1024 * 1024) {
-        let fakeProg = 5;
+      // For large files (> 500MB) or stream downloads, use native browser download stream directly
+      if (validSize > 500 * 1024 * 1024) {
+        let fakeProg = 10;
         setProgress(fakeProg);
         const interval = setInterval(() => {
-          fakeProg = Math.min(fakeProg + 5, 95);
+          fakeProg = Math.min(fakeProg + 10, 95);
           setProgress(fakeProg);
-        }, 800);
+        }, 500);
 
         const downloadUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
-
-        let iframe = document.getElementById('hidden-download-iframe') as HTMLIFrameElement;
-        if (!iframe) {
-          iframe = document.createElement('iframe');
-          iframe.id = 'hidden-download-iframe';
-          iframe.style.display = 'none';
-          document.body.appendChild(iframe);
-        }
-        iframe.src = downloadUrl;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = fileName || 'download';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
 
         setTimeout(() => {
           clearInterval(interval);
           setProgress(100);
           setTimeout(() => {
             setIsDownloading(false);
-          }, 1500);
-        }, 4000);
+          }, 1000);
+        }, 3000);
 
         return;
       }
@@ -67,7 +65,7 @@ export function useProgressiveDownloader() {
 
       const fetchSingleChunk = async (chunkIndex: number) => {
         let downloaded = false;
-        let retries = 25; // Retry up to 25 times (12.5 seconds) for real-time background uploads
+        let retries = 15;
 
         while (!downloaded && retries > 0) {
           try {
@@ -79,11 +77,11 @@ export function useProgressiveDownloader() {
               downloaded = true;
             } else {
               retries--;
-              if (retries > 0) await new Promise((r) => setTimeout(r, 500));
+              if (retries > 0) await new Promise((r) => setTimeout(r, 400));
             }
           } catch (err) {
             retries--;
-            if (retries > 0) await new Promise((r) => setTimeout(r, 500));
+            if (retries > 0) await new Promise((r) => setTimeout(r, 400));
           }
         }
 
@@ -116,21 +114,20 @@ export function useProgressiveDownloader() {
       }, 1000);
     } catch (err: any) {
       console.warn('[Progressive Downloader Fallback Triggered]', err);
-      // Fallback: Trigger silent hidden iframe stream without redirecting page
+      // Fallback: Trigger native browser stream download
       const downloadUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
-      let iframe = document.getElementById('hidden-download-iframe') as HTMLIFrameElement;
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'hidden-download-iframe';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-      }
-      iframe.src = downloadUrl;
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName || 'download';
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
 
       setProgress(100);
       setTimeout(() => {
         setIsDownloading(false);
-      }, 1500);
+      }, 1000);
     }
   };
 
