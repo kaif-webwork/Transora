@@ -27,7 +27,6 @@ export default function ReceivePage() {
       const paramStr = passcode ? `?password=${encodeURIComponent(passcode)}` : '';
       const endpoints = [
         getBackendApiUrl(`/api/v1/share/${shareCode}${paramStr}`),
-        `https://swiftsharebackend-production.up.railway.app/api/v1/share/${shareCode}${paramStr}`,
         `https://transora-q6nu.onrender.com/api/v1/share/${shareCode}${paramStr}`,
       ];
 

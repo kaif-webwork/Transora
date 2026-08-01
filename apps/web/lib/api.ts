@@ -1,4 +1,4 @@
-const STABLE_PRODUCTION_BACKEND = 'https://swiftsharebackend-production.up.railway.app';
+const RENDER_PRODUCTION_BACKEND = 'https://transora-q6nu.onrender.com';
 
 export function getBackendApiUrl(path: string): string {
   if (typeof window !== 'undefined') {
@@ -9,8 +9,12 @@ export function getBackendApiUrl(path: string): string {
     }
   }
 
-  // Always target stable Railway production backend to ensure Sender and Receiver use the exact same storage & server
-  return `${STABLE_PRODUCTION_BACKEND}${path}`;
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim() !== '') {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/$/, '');
+    return `${baseUrl}${path}`;
+  }
+
+  return `${RENDER_PRODUCTION_BACKEND}${path}`;
 }
 
 export function getDirectBackendDownloadUrl(path: string): string {
@@ -33,7 +37,7 @@ export function setCustomBackendUrl(url: string): void {
 
 export function getStoredBackendUrl(): string {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('transora_backend_url') || STABLE_PRODUCTION_BACKEND;
+    return localStorage.getItem('transora_backend_url') || process.env.NEXT_PUBLIC_API_URL || RENDER_PRODUCTION_BACKEND;
   }
-  return STABLE_PRODUCTION_BACKEND;
+  return process.env.NEXT_PUBLIC_API_URL || RENDER_PRODUCTION_BACKEND;
 }
