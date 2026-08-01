@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Zap, Clock, HardDrive, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Zap, Clock, HardDrive, ShieldCheck, Wifi } from 'lucide-react';
 import { useTransferStore } from '../store/useTransferStore';
 
 export function ChunkProgress() {
@@ -22,17 +22,20 @@ export function ChunkProgress() {
   };
 
   return (
-    <div className="w-full glass-panel rounded-2xl p-6 border border-white/10 space-y-4">
+    <div className="w-full glass-panel rounded-2xl p-6 border border-cyan-500/30 space-y-4 glow-cyan">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center">
-            <Zap className="w-4 h-4 animate-spin" />
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+            <Zap className="w-4 h-4 animate-spin text-cyan-300" />
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-white">
-              {isUploading ? 'Uploading File Chunks...' : 'Transfer Processing'}
+            <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+              {isUploading ? 'Streaming 16MB Turbo Chunks...' : 'Transfer Processing'}
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                ⚡ Zero-Wait Streaming Active
+              </span>
             </h4>
-            <p className="text-xs text-slate-400">5MB Parallel Multi-Worker Lane</p>
+            <p className="text-xs text-slate-400">16MB Turbo Multi-Lane Pipeline (12 Concurrent Workers)</p>
           </div>
         </div>
 
@@ -44,7 +47,7 @@ export function ChunkProgress() {
       {/* Progress Bar Container */}
       <div className="relative w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-white/10">
         <motion.div
-          className="h-full bg-gradient-to-r from-brand-600 via-neon-purple to-neon-cyan"
+          className="h-full bg-gradient-to-r from-cyan-500 via-brand-500 to-neon-purple"
           initial={{ width: 0 }}
           animate={{ width: `${progress.percentage}%` }}
           transition={{ ease: 'easeOut', duration: 0.3 }}
@@ -79,6 +82,13 @@ export function ChunkProgress() {
             {progress.uploadedChunks} / {progress.totalChunks}
           </span>
         </div>
+      </div>
+
+      <div className="text-[11px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-white/5 flex items-center gap-2">
+        <Wifi className="w-4 h-4 text-cyan-400 shrink-0" />
+        <span>
+          💡 <strong>Tip for 100MB/s Ultra Speed:</strong> For nearby devices, select <strong>Local WiFi</strong> mode to bypass cloud internet limits!
+        </span>
       </div>
     </div>
   );
