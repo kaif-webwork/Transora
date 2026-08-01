@@ -12,9 +12,13 @@ export function getBackendApiUrl(path: string): string {
     return `${baseUrl}${path}`;
   }
 
-  // Live Production Backend Fallback URL
-  const defaultLiveApi = 'https://swiftsharebackend-production.up.railway.app';
-  return `${defaultLiveApi}${path}`;
+  // Same-origin relative path for web client to leverage Next.js rewrites proxy
+  if (typeof window !== 'undefined') {
+    return path;
+  }
+
+  // Fallback for SSR / Node environment
+  return `https://swiftsharebackend-production.up.railway.app${path}`;
 }
 
 export function setCustomBackendUrl(url: string): void {

@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@transora/shared'],
   async rewrites() {
-    let backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    let backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://swiftsharebackend-production.up.railway.app';
     if (!backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
       backendUrl = `https://${backendUrl}`;
     }

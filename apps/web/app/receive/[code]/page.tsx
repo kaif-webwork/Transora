@@ -24,8 +24,30 @@ export default function ReceivePage() {
     setLoading(true);
     setError(null);
     try {
-      const shareApiUrl = getBackendApiUrl(`/api/v1/share/${shareCode}${passcode ? `?password=${encodeURIComponent(passcode)}` : ''}`);
-      const res = await fetch(shareApiUrl);
+      const paramStr = passcode ? `?password=${encodeURIComponent(passcode)}` : '';
+      const endpoints = [
+        getBackendApiUrl(`/api/v1/share/${shareCode}${paramStr}`),
+        `https://swiftsharebackend-production.up.railway.app/api/v1/share/${shareCode}${paramStr}`,
+        `https://transora-q6nu.onrender.com/api/v1/share/${shareCode}${paramStr}`,
+      ];
+
+      let res: Response | null = null;
+      let lastErr: any = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          res = await fetch(endpoint);
+          if (res && (res.ok || res.status === 400 || res.status === 404)) {
+            break;
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (!res) {
+        throw new Error(lastErr?.message || 'Cannot connect to Backend Server. Network fetch failed.');
+      }
 
       const contentType = res.headers.get('content-type') || '';
       let data: any = {};
