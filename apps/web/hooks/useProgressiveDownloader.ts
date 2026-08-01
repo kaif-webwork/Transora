@@ -3,7 +3,7 @@ import { getDirectBackendDownloadUrl } from '../lib/api';
 
 export function useProgressiveDownloader() {
   const [isDownloading, setIsDownloading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [downloadStarted, setDownloadStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const downloadTransfer = async (
@@ -13,16 +13,10 @@ export function useProgressiveDownloader() {
     fileSizeBytes?: number
   ) => {
     setIsDownloading(true);
-    setProgress(10);
+    setDownloadStarted(false);
     setError(null);
 
     try {
-      let fakeProg = 10;
-      const interval = setInterval(() => {
-        fakeProg = Math.min(fakeProg + 10, 95);
-        setProgress(fakeProg);
-      }, 300);
-
       // Direct backend download stream URL bypassing Vercel edge proxy and JS memory buffering
       const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
 
@@ -35,13 +29,10 @@ export function useProgressiveDownloader() {
       a.click();
       document.body.removeChild(a);
 
+      setDownloadStarted(true);
       setTimeout(() => {
-        clearInterval(interval);
-        setProgress(100);
-        setTimeout(() => {
-          setIsDownloading(false);
-        }, 1000);
-      }, 1500);
+        setIsDownloading(false);
+      }, 2500);
     } catch (err: any) {
       console.error('[Download Failed]', err);
       setError(err.message || 'Download failed');
@@ -49,5 +40,5 @@ export function useProgressiveDownloader() {
     }
   };
 
-  return { downloadTransfer, isDownloading, progress, error };
+  return { downloadTransfer, isDownloading, downloadStarted, progress: 0, error };
 }

@@ -185,7 +185,7 @@ export default function ReceivePage() {
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-600 via-brand-600 to-neon-purple text-white font-bold text-base shadow-xl hover:brightness-110 transition flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <DownloadCloud className="w-5 h-5 animate-bounce" />
-            {isDownloading ? `${progress}% Streaming Chunks...` : 'Instant 1-Click Download All'}
+            {isDownloading ? 'Starting Download Stream...' : 'Instant 1-Click Download All'}
           </button>
 
           {/* Individual File Items */}
