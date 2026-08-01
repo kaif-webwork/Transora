@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { DownloadCloud, ShieldCheck, Lock, File, HardDrive, CheckCircle2, Clock, Zap } from 'lucide-react';
+import { DownloadCloud, ShieldCheck, Lock, File, CheckCircle2 } from 'lucide-react';
 import { useProgressiveDownloader } from '../../../hooks/useProgressiveDownloader';
+import { getBackendApiUrl } from '../../../lib/api';
 import { io, Socket } from 'socket.io-client';
 
 export default function ReceivePage() {
@@ -23,9 +24,16 @@ export default function ReceivePage() {
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/v1/share/${shareCode}${passcode ? `?password=${encodeURIComponent(passcode)}` : ''}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const shareApiUrl = getBackendApiUrl(`/api/v1/share/${shareCode}${passcode ? `?password=${encodeURIComponent(passcode)}` : ''}`);
+      const res = await fetch(shareApiUrl);
+
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = {};
+      if (contentType.includes('application/json')) {
+        data = await res.json().catch(() => ({}));
+      } else {
+        throw new Error('Transfer link unresolvable. Please check backend connection.');
+      }
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to fetch transfer link');
@@ -39,8 +47,13 @@ export default function ReceivePage() {
 
         // Notify Socket.IO room that receiver has arrived
         if (data.transfer && data.transfer.id) {
-          const socket: Socket = io('/', { path: '/socket.io' });
-          socket.emit('transfer:join', { transferId: data.transfer.id, role: 'receiver' });
+          try {
+            const socketUrl = getBackendApiUrl('/');
+            const socket: Socket = io(socketUrl, { path: '/socket.io' });
+            socket.emit('transfer:join', { transferId: data.transfer.id, role: 'receiver' });
+          } catch (e) {
+            // Socket connection optional for fallback
+          }
         }
       }
     } catch (err: any) {
@@ -86,7 +99,7 @@ export default function ReceivePage() {
       {loading ? (
         <div className="glass-panel rounded-3xl p-12 text-center space-y-4">
           <div className="w-12 h-12 rounded-full border-4 border-brand-500 border-t-transparent animate-spin mx-auto" />
-          <p className="text-sm text-slate-400">Connecting to Transora Sender Stream...</p>
+          <p className="text-sm text-slate-400">Connecting to Transora Transfer Stream...</p>
         </div>
       ) : error ? (
         <div className="glass-panel rounded-3xl p-12 text-center space-y-4 border-rose-500/30">

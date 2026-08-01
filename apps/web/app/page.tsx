@@ -10,6 +10,7 @@ import { useChunkUploader } from '../hooks/useChunkUploader';
 import { useTransferStore } from '../store/useTransferStore';
 import { Zap, Shield, Lock, Clock, QrCode, Copy, Check, Radio, HardDrive, Share2, Smartphone, Users, Globe, WifiOff, Sun } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
+import { getBackendApiUrl } from '../lib/api';
 
 export default function HomePage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -66,7 +67,8 @@ export default function HomePage() {
   useEffect(() => {
     if (!createdTransferId) return;
 
-    const socket: Socket = io('/', { path: '/socket.io' });
+    const socketUrl = getBackendApiUrl('/');
+    const socket: Socket = io(socketUrl, { path: '/socket.io' });
     socket.emit('transfer:join', { transferId: createdTransferId, role: 'sender' });
 
     socket.on('receiver:joined', () => {

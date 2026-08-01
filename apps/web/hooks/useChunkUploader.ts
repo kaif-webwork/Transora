@@ -154,7 +154,13 @@ export function useChunkUploader() {
       }
 
       setIsUploading(false);
-      return { transferId, shareCode, shareUrl };
+
+      // Always construct exact client origin URL for QR code & share link
+      const clientShareUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/receive/${shareCode}`
+        : (shareUrl || `/receive/${shareCode}`);
+
+      return { transferId, shareCode, shareUrl: clientShareUrl };
     } catch (err: any) {
       setError(err.message || 'Upload failed');
       setIsUploading(false);

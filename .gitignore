@@ -31,3 +31,5 @@ temp_chunks/
 
 # Coverage
 coverage/
+.vercel
+.env*
