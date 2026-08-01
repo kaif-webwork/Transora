@@ -22,17 +22,8 @@ export function useProgressiveDownloader() {
     const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download${queryParams}`);
 
     try {
-      // Trigger C++ native browser disk stream via hidden iframe with 0 MB JS Memory usage
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = downloadUrl;
-      document.body.appendChild(iframe);
-
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 30000);
+      // Direct Chrome Native Attachment Download Trigger
+      window.location.href = downloadUrl;
 
       setTimeout(() => {
         setIsDownloading(false);
