@@ -48,7 +48,7 @@ export function useProgressiveDownloader() {
       }
 
       const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
+      const chunks: BlobPart[] = [];
       let receivedBytes = 0;
       let startTime = Date.now();
 
