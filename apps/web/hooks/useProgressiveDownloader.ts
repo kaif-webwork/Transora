@@ -20,7 +20,8 @@ export function useProgressiveDownloader() {
     setDownloadSpeed('0 MB/s');
     setError(null);
 
-    const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
+    const queryParams = `?fileName=${encodeURIComponent(fileName)}&fileSize=${fileSizeBytes || 0}`;
+    const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download${queryParams}`);
 
     try {
       const response = await fetch(downloadUrl, {

@@ -293,8 +293,8 @@ export class TransferService {
       } catch (err) {}
     }
 
-    const fileName = file ? (file.file_name || file.fileName || 'downloaded_file') : 'downloaded_file';
-    const fileSizeBytes = file ? (file.file_size_bytes || file.fileSizeBytes || 0) : 0;
+    const fileName = file ? (file.file_name || file.fileName || 'downloaded_file') : (req?.query?.fileName ? String(req.query.fileName) : 'downloaded_file');
+    const fileSizeBytes = file ? (file.file_size_bytes || file.fileSizeBytes || 0) : (req?.query?.fileSize ? parseInt(String(req.query.fileSize), 10) : 0);
     const mimeType = file ? (file.mime_type || file.mimeType || 'application/octet-stream') : 'application/octet-stream';
 
     // Prevent socket timeout during large file downloads (e.g. 2GB+)

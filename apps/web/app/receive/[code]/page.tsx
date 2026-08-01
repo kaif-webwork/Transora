@@ -180,7 +180,9 @@ export default function ReceivePage() {
           {/* Error Alert */}
           {downloadError && (
             <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium text-center">
-              ⚠️ {downloadError}
+              {downloadError.includes('404')
+                ? '⚠️ Transfer Expired: This file is no longer on the server. Please ask the sender to re-upload.'
+                : `⚠️ ${downloadError}`}
             </div>
           )}
 
