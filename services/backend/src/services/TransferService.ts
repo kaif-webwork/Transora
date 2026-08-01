@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
 import { pool, isPostgresAvailable } from '../db/index.js';
 import { StorageService } from './StorageService.js';
 import { RedisService } from './RedisService.js';
@@ -163,8 +165,10 @@ export class TransferService {
     sha256Checksum: string,
     buffer: Buffer
   ) {
-    // Write chunk directly to storage without blocking on sync CPU hashing
     const storageKey = await StorageService.saveChunk(transferId, fileId, chunkIndex, buffer);
+
+    memoryChunks.set(`${fileId}:${chunkIndex}`, storageKey);
+    memoryChunks.set(`${transferId}:${fileId}:${chunkIndex}`, storageKey);
 
     if (isPostgresAvailable) {
       try {
@@ -175,34 +179,15 @@ export class TransferService {
            DO UPDATE SET is_uploaded = TRUE, uploaded_at = CURRENT_TIMESTAMP`,
           [fileId, chunkIndex, buffer.length, sha256Checksum || 'fast_checksum', storageKey]
         );
-      } catch (err) {
-        memoryChunks.set(`${fileId}:${chunkIndex}`, storageKey);
-      }
-    } else {
-      memoryChunks.set(`${fileId}:${chunkIndex}`, storageKey);
+      } catch (err) {}
     }
 
     const uploadedChunks = await RedisService.trackChunkProgress(transferId, chunkIndex);
 
-    if (isPostgresAvailable) {
-      try {
-        await pool.query(
-          `UPDATE transfers SET uploaded_chunks = uploaded_chunks + 1, status = 'UPLOADING', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          [transferId]
-        );
-      } catch (err) {
-        const transfer = memoryTransfers.get(transferId);
-        if (transfer) {
-          transfer.uploaded_chunks += 1;
-          transfer.status = 'UPLOADING';
-        }
-      }
-    } else {
-      const transfer = memoryTransfers.get(transferId);
-      if (transfer) {
-        transfer.uploaded_chunks += 1;
-        transfer.status = 'UPLOADING';
-      }
+    const transfer = memoryTransfers.get(transferId);
+    if (transfer) {
+      transfer.uploaded_chunks += 1;
+      transfer.status = 'UPLOADING';
     }
 
     return { success: true, uploadedChunks, storageKey };
@@ -210,7 +195,7 @@ export class TransferService {
 
   static async getShareLink(shareCode: string, password?: string) {
     let transfer = null;
-    let files = [];
+    let files: any[] = [];
 
     if (isPostgresAvailable) {
       try {
@@ -261,9 +246,9 @@ export class TransferService {
   }
 
   static async getChunkStream(transferId: string, fileId: string, chunkIndex: number) {
-    let storageKey = null;
+    let storageKey = memoryChunks.get(`${fileId}:${chunkIndex}`) || memoryChunks.get(`${transferId}:${fileId}:${chunkIndex}`);
 
-    if (isPostgresAvailable) {
+    if (!storageKey && isPostgresAvailable) {
       try {
         const chunkRes = await pool.query(
           `SELECT storage_key FROM file_chunks WHERE file_id = $1 AND chunk_index = $2 AND is_uploaded = TRUE`,
@@ -272,16 +257,19 @@ export class TransferService {
         if (chunkRes.rows.length > 0) {
           storageKey = chunkRes.rows[0].storage_key;
         }
-      } catch (err) {
-        storageKey = memoryChunks.get(`${fileId}:${chunkIndex}`);
-      }
-    } else {
-      storageKey = memoryChunks.get(`${fileId}:${chunkIndex}`);
+      } catch (err) {}
     }
 
     if (!storageKey) {
-      const localPath = `./uploads/${transferId}/${fileId}/chunk_${chunkIndex}.bin`;
-      storageKey = localPath;
+      const dir = path.join(config.storage.localUploadDir, transferId, fileId);
+      storageKey = path.join(dir, `chunk_${chunkIndex}.bin`);
+    }
+
+    // Active Polling Loop: wait up to 10 seconds for real-time streaming chunks
+    let attempts = 20;
+    while (!fs.existsSync(storageKey) && attempts > 0) {
+      await new Promise((r) => setTimeout(r, 500));
+      attempts--;
     }
 
     return StorageService.getChunkStream(storageKey);

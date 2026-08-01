@@ -51,8 +51,12 @@ export class StorageService {
       return response.Body as NodeJS.ReadableStream;
     }
 
+    const resolvedPath = path.resolve(storageKey);
+    if (fs.existsSync(resolvedPath)) {
+      return fs.createReadStream(resolvedPath, { highWaterMark: 1024 * 1024 });
+    }
     if (fs.existsSync(storageKey)) {
-      return fs.createReadStream(storageKey, { highWaterMark: 1024 * 1024 }); // 1MB highWaterMark stream buffer
+      return fs.createReadStream(storageKey, { highWaterMark: 1024 * 1024 });
     }
 
     throw new Error(`Chunk file not found at ${storageKey}`);
