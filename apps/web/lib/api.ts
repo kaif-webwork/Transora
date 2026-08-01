@@ -30,13 +30,9 @@ export function getDirectBackendDownloadUrl(path: string): string {
     }
   }
 
-  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim() !== '' && process.env.NEXT_PUBLIC_API_URL.startsWith('http')) {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/$/, '');
-    return `${baseUrl}${path}`;
-  }
-
-  // Direct backend endpoint bypassing Vercel 10MB serverless proxy limit
-  return `https://swiftsharebackend-production.up.railway.app${path}`;
+  // Always target stable production Railway backend for file downloads to prevent Render 502 Bad Gateway timeouts
+  const stableBackend = 'https://swiftsharebackend-production.up.railway.app';
+  return `${stableBackend}${path}`;
 }
 
 export function setCustomBackendUrl(url: string): void {

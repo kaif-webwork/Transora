@@ -324,6 +324,8 @@ export class TransferService {
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
     res.setHeader('Content-Type', mimeType);
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
 
     const chunkSize = fileSizeBytes > 0 ? (
       fileSizeBytes < 50 * 1024 * 1024 ? 4 * 1024 * 1024 :
