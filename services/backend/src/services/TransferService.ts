@@ -245,6 +245,10 @@ export class TransferService {
     };
   }
 
+  static async getTransferByShareCode(shareCode: string, password?: string) {
+    return this.getShareLink(shareCode, password);
+  }
+
   static async getChunkStream(transferId: string, fileId: string, chunkIndex: number) {
     let storageKey = memoryChunks.get(`${fileId}:${chunkIndex}`) || memoryChunks.get(`${transferId}:${fileId}:${chunkIndex}`);
 

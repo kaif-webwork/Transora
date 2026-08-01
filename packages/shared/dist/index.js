@@ -1,4 +1,3 @@
-"use strict";
 // Transora Shared Data Models & Interfaces
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};
 //# sourceMappingURL=index.js.map
