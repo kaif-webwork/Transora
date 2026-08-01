@@ -1,9 +1,11 @@
 import { Pool } from 'pg';
 import { config } from '../config/index.js';
 
+export let isPostgresAvailable = false;
+
 export const pool = new Pool(
   config.postgres.connectionString
-    ? { connectionString: config.postgres.connectionString }
+    ? { connectionString: config.postgres.connectionString, connectionTimeoutMillis: 1500 }
     : {
         host: config.postgres.host,
         port: config.postgres.port,
@@ -12,11 +14,12 @@ export const pool = new Pool(
         database: config.postgres.database,
         max: 5,
         idleTimeoutMillis: 5000,
-        connectionTimeoutMillis: 1000,
+        connectionTimeoutMillis: 1500,
       }
 );
 
 pool.on('error', (err) => {
+  isPostgresAvailable = false;
   console.warn('[PostgreSQL Pool Warning] Database offline or connection lost:', err.message);
 });
 
@@ -24,6 +27,9 @@ export async function initDatabase() {
   let client;
   try {
     client = await pool.connect();
+    await client.query('SELECT 1;');
+    isPostgresAvailable = true;
+    
     await client.query(`
       CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -111,7 +117,8 @@ export async function initDatabase() {
     `);
     console.log('[Database] PostgreSQL schema initialized successfully.');
   } catch (err: any) {
-    console.warn('[Database] PostgreSQL offline, using resilient in-memory mode:', err.message);
+    isPostgresAvailable = false;
+    console.warn('[Database] PostgreSQL offline, using ultra-fast in-memory mode:', err.message);
   } finally {
     if (client) {
       try { client.release(); } catch (e) {}
