@@ -51,7 +51,7 @@ export default function ReceivePage() {
       }
 
       if (!res) {
-        throw new Error('Server connection is waking up. Please click Retry Connection.');
+        throw new Error('Server connection is starting up. Please click Retry Connection below.');
       }
 
       const contentType = res.headers.get('content-type') || '';
@@ -84,7 +84,12 @@ export default function ReceivePage() {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Transfer not found or expired');
+      const rawMsg = err?.message || '';
+      if (rawMsg.includes('Failed to fetch') || rawMsg.includes('network') || rawMsg.includes('fetch')) {
+        setError('Server is starting up or updating. Please click Retry Connection below.');
+      } else {
+        setError(rawMsg || 'Transfer not found or expired');
+      }
     } finally {
       setLoading(false);
     }
