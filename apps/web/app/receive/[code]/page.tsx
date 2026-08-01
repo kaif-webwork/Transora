@@ -81,7 +81,7 @@ export default function ReceivePage() {
         transferData.id,
         file.id,
         file.file_name,
-        transferData.total_chunks
+        file.file_size_bytes || transferData.total_size_bytes || 1024 * 1024
       );
     }
   };
@@ -182,7 +182,7 @@ export default function ReceivePage() {
                       transferData.id,
                       file.id,
                       file.file_name,
-                      transferData.total_chunks
+                      file.file_size_bytes || 1024 * 1024
                     )
                   }
                   disabled={isDownloading}

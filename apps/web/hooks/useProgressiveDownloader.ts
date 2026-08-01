@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { getBackendApiUrl } from '../lib/api';
 
-const PARALLEL_DOWNLOAD_WORKERS = 12; // 12 Parallel Turbo HTTP GET Download Lanes
+const PARALLEL_DOWNLOAD_WORKERS = 12;
+
+function getAdaptiveChunkSize(fileSize: number): number {
+  if (fileSize < 50 * 1024 * 1024) return 4 * 1024 * 1024;
+  if (fileSize < 500 * 1024 * 1024) return 8 * 1024 * 1024;
+  return 16 * 1024 * 1024;
+}
 
 export function useProgressiveDownloader() {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -12,11 +18,16 @@ export function useProgressiveDownloader() {
     transferId: string,
     fileId: string,
     fileName: string,
-    totalChunks: number
+    fileSizeBytes: number,
+    explicitTotalChunks?: number
   ) => {
     setIsDownloading(true);
     setProgress(0);
     setError(null);
+
+    const chunkSize = getAdaptiveChunkSize(fileSizeBytes || 1024 * 1024);
+    const calculatedChunks = Math.max(1, Math.ceil((fileSizeBytes || 1024 * 1024) / chunkSize));
+    const totalChunks = explicitTotalChunks && explicitTotalChunks > 0 ? explicitTotalChunks : calculatedChunks;
 
     const chunkBlobs: Blob[] = new Array(totalChunks);
     let downloadedCount = 0;
@@ -26,7 +37,7 @@ export function useProgressiveDownloader() {
 
       const fetchSingleChunk = async (chunkIndex: number) => {
         let downloaded = false;
-        let retries = 10;
+        let retries = 5;
 
         while (!downloaded && retries > 0) {
           try {
@@ -38,11 +49,15 @@ export function useProgressiveDownloader() {
               downloaded = true;
             } else {
               retries--;
-              await new Promise((resolve) => setTimeout(resolve, 800));
+              if (retries > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 300));
+              }
             }
           } catch (err) {
             retries--;
-            await new Promise((resolve) => setTimeout(resolve, 800));
+            if (retries > 0) {
+              await new Promise((resolve) => setTimeout(resolve, 300));
+            }
           }
         }
 
@@ -54,13 +69,11 @@ export function useProgressiveDownloader() {
         setProgress(Math.round((downloadedCount / totalChunks) * 100));
       };
 
-      // Execute 6-lane parallel chunk fetch pool
       for (let i = 0; i < chunkIndices.length; i += PARALLEL_DOWNLOAD_WORKERS) {
         const batch = chunkIndices.slice(i, i + PARALLEL_DOWNLOAD_WORKERS);
         await Promise.all(batch.map((idx) => fetchSingleChunk(idx)));
       }
 
-      // Assemble Chunks in exact numerical order & trigger direct browser save
       const fullBlob = new Blob(chunkBlobs, { type: 'application/octet-stream' });
       const url = window.URL.createObjectURL(fullBlob);
       const a = document.createElement('a');
@@ -73,6 +86,7 @@ export function useProgressiveDownloader() {
 
       setIsDownloading(false);
     } catch (err: any) {
+      console.error('[ProgressiveDownloader Error]', err);
       setError(err.message || 'Progressive download failed');
       setIsDownloading(false);
     }
