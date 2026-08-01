@@ -7,12 +7,14 @@ export function getBackendApiUrl(path: string): string {
     }
   }
 
-  if (process.env.NEXT_PUBLIC_API_URL) {
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim() !== '') {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/$/, '');
     return `${baseUrl}${path}`;
   }
 
-  return path;
+  // Live Production Backend Fallback URL
+  const defaultLiveApi = 'https://swiftsharebackend-production.up.railway.app';
+  return `${defaultLiveApi}${path}`;
 }
 
 export function setCustomBackendUrl(url: string): void {
@@ -31,7 +33,7 @@ export function setCustomBackendUrl(url: string): void {
 
 export function getStoredBackendUrl(): string {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('transora_backend_url') || process.env.NEXT_PUBLIC_API_URL || '';
+    return localStorage.getItem('transora_backend_url') || process.env.NEXT_PUBLIC_API_URL || 'https://swiftsharebackend-production.up.railway.app';
   }
-  return process.env.NEXT_PUBLIC_API_URL || '';
+  return process.env.NEXT_PUBLIC_API_URL || 'https://swiftsharebackend-production.up.railway.app';
 }

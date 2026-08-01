@@ -297,7 +297,9 @@ export class TransferService {
     const fileSizeBytes = file ? (file.file_size_bytes || file.fileSizeBytes || 0) : 0;
     const mimeType = file ? (file.mime_type || file.mimeType || 'application/octet-stream') : 'application/octet-stream';
 
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
     res.setHeader('Content-Type', mimeType);
     if (fileSizeBytes > 0) {
       res.setHeader('Content-Length', fileSizeBytes.toString());
