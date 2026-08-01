@@ -186,7 +186,7 @@ export default function ReceivePage() {
             </div>
           )}
 
-          {/* 1-Click Instant Download Button with Live Progress Bar */}
+          {/* 1-Click Instant Download Button */}
           <div className="space-y-2">
             <button
               onClick={handleDownloadAll}
@@ -194,17 +194,8 @@ export default function ReceivePage() {
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-600 via-brand-600 to-neon-purple text-white font-bold text-base shadow-xl hover:brightness-110 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <DownloadCloud className="w-5 h-5 animate-bounce" />
-              {isDownloading ? `Downloading... ${progress}% (${downloadSpeed})` : 'Instant 1-Click Download All'}
+              {isDownloading ? 'Starting Native Browser Download...' : 'Instant 1-Click Download All'}
             </button>
-
-            {isDownloading && (
-              <div className="w-full bg-slate-900/80 rounded-full h-3.5 overflow-hidden p-0.5 border border-white/10 shadow-inner">
-                <div
-                  className="bg-gradient-to-r from-cyan-500 via-emerald-400 to-neon-purple h-full rounded-full transition-all duration-300 shadow-md flex items-center justify-end pr-2"
-                  style={{ width: `${Math.max(5, progress)}%` }}
-                />
-              </div>
-            )}
           </div>
 
           {/* Individual File Items */}

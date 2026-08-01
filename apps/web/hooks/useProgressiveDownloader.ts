@@ -16,96 +16,30 @@ export function useProgressiveDownloader() {
   ) => {
     setIsDownloading(true);
     setDownloadStarted(true);
-    setProgress(0);
-    setDownloadSpeed('0 MB/s');
     setError(null);
 
     const queryParams = `?fileName=${encodeURIComponent(fileName)}&fileSize=${fileSizeBytes || 0}`;
     const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download${queryParams}`);
 
     try {
-      const response = await fetch(downloadUrl, {
-        mode: 'cors',
-        headers: {
-          'Accept': '*/*',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server returned HTTP ${response.status}: File unavailable or expired`);
-      }
-
-      const contentLengthHeader = response.headers.get('content-length');
-      const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (fileSizeBytes || 0);
-
-      if (!response.body) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName || 'downloaded_file';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          window.URL.revokeObjectURL(url);
-          if (document.body.contains(a)) document.body.removeChild(a);
-        }, 100);
-        setProgress(100);
-        setTimeout(() => setIsDownloading(false), 1500);
-        return;
-      }
-
-      const reader = response.body.getReader();
-      const chunks: BlobPart[] = [];
-      let receivedBytes = 0;
-      let startTime = Date.now();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        if (value) {
-          chunks.push(value);
-          receivedBytes += value.length;
-
-          if (totalBytes > 0) {
-            const pct = Math.min(99, Math.round((receivedBytes / totalBytes) * 100));
-            setProgress(pct);
-          }
-
-          const elapsedTimeSec = (Date.now() - startTime) / 1000;
-          if (elapsedTimeSec > 0.5) {
-            const speedMBps = (receivedBytes / (1024 * 1024) / elapsedTimeSec).toFixed(1);
-            setDownloadSpeed(`${speedMBps} MB/s`);
-          }
-        }
-      }
-
-      setProgress(100);
-
-      // Create Same-Origin Blob URL so Chrome 100% respects the download attribute without top-level page navigation
-      const blob = new Blob(chunks, { type: 'application/octet-stream' });
-      const sameOriginBlobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = sameOriginBlobUrl;
-      a.download = fileName || 'downloaded_file';
-      document.body.appendChild(a);
-      a.click();
+      // Trigger C++ native browser disk stream via hidden iframe with 0 MB JS Memory usage
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = downloadUrl;
+      document.body.appendChild(iframe);
 
       setTimeout(() => {
-        window.URL.revokeObjectURL(sameOriginBlobUrl);
-        if (document.body.contains(a)) {
-          document.body.removeChild(a);
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
         }
-      }, 500);
+      }, 30000);
 
       setTimeout(() => {
         setIsDownloading(false);
-      }, 2000);
+      }, 3000);
     } catch (err: any) {
-      console.error('[In-Page Downloader Error]', err);
-      // NEVER navigate top-level window to cross-origin URLs on error!
-      setError(err.message || 'Download failed: File unavailable on server');
+      console.error('[Native Downloader Error]', err);
+      setError(err.message || 'Download failed');
       setIsDownloading(false);
     }
   };
