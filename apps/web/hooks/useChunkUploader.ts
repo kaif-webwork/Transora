@@ -54,22 +54,38 @@ export function useChunkUploader() {
       });
 
       // 2. Register Transfer with Backend FIRST (Fast 50ms Awaited Payload Registration)
-      const initUrl = getBackendApiUrl('/api/v1/init');
-      let initRes: Response;
-      try {
-        initRes = await fetch(initUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: files.length === 1 ? files[0].name : `${files.length} Files Transfer`,
-            expiryType: options.expiryType || '24_HOURS',
-            password: options.password || undefined,
-            transferMode: options.transferMode || 'CLOUD_CHUNK',
-            files: fileSpecs,
-            shareCode: clientShareCode,
-          }),
-        });
-      } catch (networkErr: any) {
+      const endpoints = [
+        getBackendApiUrl('/api/v1/init'),
+        'https://transora-q6nu.onrender.com/api/v1/init',
+      ];
+
+      let initRes: Response | null = null;
+      let initErr: any = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: files.length === 1 ? files[0].name : `${files.length} Files Transfer`,
+              expiryType: options.expiryType || '24_HOURS',
+              password: options.password || undefined,
+              transferMode: options.transferMode || 'CLOUD_CHUNK',
+              files: fileSpecs,
+              shareCode: clientShareCode,
+            }),
+          });
+          if (res.ok) {
+            initRes = res;
+            break;
+          }
+        } catch (err: any) {
+          initErr = err;
+        }
+      }
+
+      if (!initRes) {
         throw new Error(`Cannot connect to Backend Server. Please check backend connection.`);
       }
 

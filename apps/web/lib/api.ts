@@ -4,8 +4,13 @@ export function getBackendApiUrl(path: string): string {
   if (typeof window !== 'undefined') {
     const customUrl = localStorage.getItem('transora_backend_url');
     if (customUrl && customUrl.trim() !== '') {
-      const baseUrl = customUrl.trim().replace(/\/$/, '');
-      return `${baseUrl}${path}`;
+      // Auto-purge stale or legacy Railway/localhost custom URLs
+      if (customUrl.includes('railway') || customUrl.includes('localhost')) {
+        localStorage.removeItem('transora_backend_url');
+      } else {
+        const baseUrl = customUrl.trim().replace(/\/$/, '');
+        return `${baseUrl}${path}`;
+      }
     }
   }
 
@@ -37,7 +42,12 @@ export function setCustomBackendUrl(url: string): void {
 
 export function getStoredBackendUrl(): string {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('transora_backend_url') || process.env.NEXT_PUBLIC_API_URL || RENDER_PRODUCTION_BACKEND;
+    const stored = localStorage.getItem('transora_backend_url');
+    if (stored && (stored.includes('railway') || stored.includes('localhost'))) {
+      localStorage.removeItem('transora_backend_url');
+      return RENDER_PRODUCTION_BACKEND;
+    }
+    return stored || process.env.NEXT_PUBLIC_API_URL || RENDER_PRODUCTION_BACKEND;
   }
   return process.env.NEXT_PUBLIC_API_URL || RENDER_PRODUCTION_BACKEND;
 }
