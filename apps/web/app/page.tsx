@@ -43,10 +43,11 @@ export default function HomePage() {
         password: usePassword ? password : undefined,
         expiryType,
         transferMode: transferMode === 'OPTICAL_LIGHT' ? 'CLOUD_CHUNK' : transferMode === 'OFFLINE_HOTSPOT' ? 'WEBRTC_LAN' : transferMode === 'LOCAL_WIFI' ? 'WEBRTC_LAN' : 'CLOUD_CHUNK',
+        onInit: (data) => {
+          setCreatedShareUrl(data.shareUrl);
+          setCreatedTransferId(data.transferId);
+        },
       });
-
-      setCreatedShareUrl(result.shareUrl);
-      setCreatedTransferId(result.transferId);
 
       // Generate Optical Light Flash Frame Payload Chunks
       if (transferMode === 'OPTICAL_LIGHT') {

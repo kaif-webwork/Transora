@@ -5,7 +5,7 @@ import { authMiddleware } from '../middlewares/authMiddleware.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per chunk limit
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB per chunk limit for ultra-fast large file uploads
 });
 
 const router = Router();

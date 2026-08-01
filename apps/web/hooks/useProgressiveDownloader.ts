@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getBackendApiUrl } from '../lib/api';
 
-const PARALLEL_DOWNLOAD_WORKERS = 6; // 6 Parallel HTTP GET Download Lanes
+const PARALLEL_DOWNLOAD_WORKERS = 12; // 12 Parallel Turbo HTTP GET Download Lanes
 
 export function useProgressiveDownloader() {
   const [isDownloading, setIsDownloading] = useState(false);
