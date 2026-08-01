@@ -18,7 +18,7 @@ export default function ReceivePage() {
   const [password, setPassword] = useState('');
   const [transferData, setTransferData] = useState<any>(null);
 
-  const { downloadTransfer, isDownloading, progress, downloadSpeed } = useProgressiveDownloader();
+  const { downloadTransfer, isDownloading, progress, downloadSpeed, error: downloadError } = useProgressiveDownloader();
 
   const fetchTransferInfo = async (passcode?: string) => {
     setLoading(true);
@@ -176,6 +176,13 @@ export default function ReceivePage() {
               <ShieldCheck className="w-3.5 h-3.5" /> SHA-256 Verified
             </span>
           </div>
+
+          {/* Error Alert */}
+          {downloadError && (
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium text-center">
+              ⚠️ {downloadError}
+            </div>
+          )}
 
           {/* 1-Click Instant Download Button with Live Progress Bar */}
           <div className="space-y-2">

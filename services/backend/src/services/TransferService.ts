@@ -319,9 +319,15 @@ export class TransferService {
       req.on('aborted', onDisconnect);
     }
 
-    const asciiFileName = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\r\n]/g, '');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, Authorization');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Range, Accept-Ranges');
+    if (req?.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    const asciiFileName = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\r\n]/g, '');
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Disposition', `attachment; filename="${asciiFileName || 'downloaded_file'}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
     res.setHeader('Content-Type', mimeType);

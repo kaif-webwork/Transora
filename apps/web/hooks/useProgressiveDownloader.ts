@@ -23,10 +23,15 @@ export function useProgressiveDownloader() {
     const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
 
     try {
-      const response = await fetch(downloadUrl);
+      const response = await fetch(downloadUrl, {
+        mode: 'cors',
+        headers: {
+          'Accept': '*/*',
+        },
+      });
 
       if (!response.ok) {
-        throw new Error(`Download request failed with status ${response.status}`);
+        throw new Error(`Server returned HTTP ${response.status}: File unavailable or expired`);
       }
 
       const contentLengthHeader = response.headers.get('content-length');
@@ -40,8 +45,10 @@ export function useProgressiveDownloader() {
         a.download = fileName || 'downloaded_file';
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          if (document.body.contains(a)) document.body.removeChild(a);
+        }, 100);
         setProgress(100);
         setTimeout(() => setIsDownloading(false), 1500);
         return;
@@ -75,40 +82,30 @@ export function useProgressiveDownloader() {
 
       setProgress(100);
 
-      // Save file cleanly without navigating away from the receive page
+      // Create Same-Origin Blob URL so Chrome 100% respects the download attribute without top-level page navigation
       const blob = new Blob(chunks, { type: 'application/octet-stream' });
-      const url = window.URL.createObjectURL(blob);
+      const sameOriginBlobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = sameOriginBlobUrl;
       a.download = fileName || 'downloaded_file';
       document.body.appendChild(a);
       a.click();
 
       setTimeout(() => {
-        window.URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(sameOriginBlobUrl);
         if (document.body.contains(a)) {
           document.body.removeChild(a);
         }
-      }, 100);
+      }, 500);
 
       setTimeout(() => {
         setIsDownloading(false);
       }, 2000);
     } catch (err: any) {
       console.error('[In-Page Downloader Error]', err);
-      try {
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = fileName || 'downloaded_file';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setProgress(100);
-      } catch (e) {
-        setError(err.message || 'Download failed');
-      } finally {
-        setTimeout(() => setIsDownloading(false), 2000);
-      }
+      // NEVER navigate top-level window to cross-origin URLs on error!
+      setError(err.message || 'Download failed: File unavailable on server');
+      setIsDownloading(false);
     }
   };
 
