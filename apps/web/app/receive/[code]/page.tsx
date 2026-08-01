@@ -36,10 +36,16 @@ export default function ReceivePage() {
 
       for (const endpoint of endpoints) {
         try {
-          res = await fetch(endpoint);
-          if (res && (res.ok || res.status === 400 || res.status === 404)) {
+          const tempRes = await fetch(endpoint);
+          if (tempRes && tempRes.ok) {
+            res = tempRes;
             break;
           }
+          if (tempRes && (tempRes.status === 400 || tempRes.status === 401)) {
+            res = tempRes;
+            break;
+          }
+          res = tempRes;
         } catch (e) {
           lastErr = e;
         }
