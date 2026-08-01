@@ -42,6 +42,7 @@ export interface Transfer {
     files: FileMetadata[];
 }
 export interface InitTransferRequest {
+    shareCode?: string;
     title?: string;
     description?: string;
     password?: string;

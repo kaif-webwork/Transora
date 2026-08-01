@@ -21,7 +21,7 @@ export class TransferService {
       throw new Error('Please select at least one valid file to transfer.');
     }
 
-    const shareCode = this.generateShareCode();
+    const shareCode = (data && data.shareCode) ? data.shareCode.toUpperCase() : this.generateShareCode();
     let passwordHash = null;
 
     if (data.password) {

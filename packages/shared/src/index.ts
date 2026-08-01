@@ -48,6 +48,7 @@ export interface Transfer {
 }
 
 export interface InitTransferRequest {
+  shareCode?: string;
   title?: string;
   description?: string;
   password?: string;
