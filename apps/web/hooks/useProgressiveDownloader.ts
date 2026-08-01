@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getBackendApiUrl } from '../lib/api';
+import { getBackendApiUrl, getDirectBackendDownloadUrl } from '../lib/api';
 
 const PARALLEL_DOWNLOAD_WORKERS = 8;
 
@@ -29,7 +29,7 @@ export function useProgressiveDownloader() {
     const totalChunks = Math.max(1, Math.ceil(validSize / chunkSize));
 
     try {
-      // For large files (> 500MB) or stream downloads, use native browser download stream directly
+      // For large files (> 500MB) or stream downloads, use native direct backend stream to bypass Vercel 10MB proxy limit
       if (validSize > 500 * 1024 * 1024) {
         let fakeProg = 10;
         setProgress(fakeProg);
@@ -38,7 +38,7 @@ export function useProgressiveDownloader() {
           setProgress(fakeProg);
         }, 500);
 
-        const downloadUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
+        const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
         const a = document.createElement('a');
         a.href = downloadUrl;
         a.download = fileName || 'download';
@@ -114,8 +114,8 @@ export function useProgressiveDownloader() {
       }, 1000);
     } catch (err: any) {
       console.warn('[Progressive Downloader Fallback Triggered]', err);
-      // Fallback: Trigger native browser stream download
-      const downloadUrl = getBackendApiUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
+      // Fallback: Trigger native direct backend stream download
+      const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
       const a = document.createElement('a');
       a.href = downloadUrl;
       a.download = fileName || 'download';
