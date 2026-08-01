@@ -83,7 +83,7 @@ export class TransferController {
   static async downloadFile(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { transferId, fileId } = req.params;
-      await TransferService.downloadFile(transferId, fileId, res);
+      await TransferService.downloadFile(transferId, fileId, res, req);
     } catch (err: any) {
       return res.status(404).json({ error: err.message || 'File download failed' });
     }

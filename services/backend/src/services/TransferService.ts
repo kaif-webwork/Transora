@@ -279,7 +279,7 @@ export class TransferService {
     return StorageService.getChunkStream(storageKey);
   }
 
-  static async downloadFile(transferId: string, fileId: string, res: any) {
+  static async downloadFile(transferId: string, fileId: string, res: any, req?: any) {
     let file: any = null;
     const filesList = memoryFiles.get(transferId) || [];
     file = filesList.find((f: any) => f.id === fileId);
@@ -297,13 +297,33 @@ export class TransferService {
     const fileSizeBytes = file ? (file.file_size_bytes || file.fileSizeBytes || 0) : 0;
     const mimeType = file ? (file.mime_type || file.mimeType || 'application/octet-stream') : 'application/octet-stream';
 
+    // Prevent socket timeout during large file downloads (e.g. 2GB+)
+    if (res.socket) {
+      res.socket.setTimeout(0);
+      res.socket.setKeepAlive(true, 10000);
+    }
+    if (req && req.socket) {
+      req.socket.setTimeout(0);
+      req.socket.setKeepAlive(true, 10000);
+    }
+
+    // Track client abort / disconnection
+    let clientDisconnected = false;
+    const onDisconnect = () => {
+      clientDisconnected = true;
+    };
+    res.on('close', onDisconnect);
+    res.on('error', onDisconnect);
+    if (req) {
+      req.on('close', onDisconnect);
+      req.on('aborted', onDisconnect);
+    }
+
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Range, Accept-Ranges');
+    res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
     res.setHeader('Content-Type', mimeType);
-    if (fileSizeBytes > 0) {
-      res.setHeader('Content-Length', fileSizeBytes.toString());
-    }
 
     const chunkSize = fileSizeBytes > 0 ? (
       fileSizeBytes < 50 * 1024 * 1024 ? 4 * 1024 * 1024 :
@@ -312,7 +332,40 @@ export class TransferService {
 
     const totalChunks = fileSizeBytes > 0 ? Math.max(1, Math.ceil(fileSizeBytes / chunkSize)) : 1;
 
-    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    // Range Header Support for resumable large downloads
+    let startByte = 0;
+    let endByte = fileSizeBytes > 0 ? fileSizeBytes - 1 : 0;
+    let isRangeRequest = false;
+
+    const rangeHeader = req?.headers?.range;
+    if (rangeHeader && fileSizeBytes > 0) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
+      if (match) {
+        isRangeRequest = true;
+        startByte = parseInt(match[1], 10);
+        if (match[2]) {
+          endByte = parseInt(match[2], 10);
+        }
+      }
+    }
+
+    if (isRangeRequest && fileSizeBytes > 0) {
+      const contentLength = endByte - startByte + 1;
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${startByte}-${endByte}/${fileSizeBytes}`);
+      res.setHeader('Content-Length', contentLength.toString());
+    } else if (fileSizeBytes > 0) {
+      res.setHeader('Content-Length', fileSizeBytes.toString());
+    }
+
+    const startChunkIndex = fileSizeBytes > 0 ? Math.floor(startByte / chunkSize) : 0;
+    const endChunkIndex = fileSizeBytes > 0 ? Math.floor(endByte / chunkSize) : totalChunks - 1;
+
+    for (let chunkIndex = startChunkIndex; chunkIndex <= endChunkIndex; chunkIndex++) {
+      if (clientDisconnected || res.destroyed || res.writableEnded) {
+        break;
+      }
+
       let storageKey = memoryChunks.get(`${fileId}:${chunkIndex}`) || memoryChunks.get(`${transferId}:${fileId}:${chunkIndex}`);
 
       if (!storageKey) {
@@ -321,21 +374,78 @@ export class TransferService {
       }
 
       let attempts = 20;
-      while (!fs.existsSync(storageKey) && attempts > 0) {
+      while (!fs.existsSync(storageKey) && attempts > 0 && !clientDisconnected) {
         await new Promise((r) => setTimeout(r, 500));
         attempts--;
       }
 
+      if (clientDisconnected || res.destroyed || res.writableEnded) {
+        break;
+      }
+
       if (fs.existsSync(storageKey)) {
-        const chunkStream = fs.createReadStream(storageKey, { highWaterMark: 1024 * 1024 });
-        await new Promise((resolve) => {
-          chunkStream.pipe(res, { end: false });
-          chunkStream.on('end', () => resolve(true));
-          chunkStream.on('error', () => resolve(false));
+        const currentChunkStartByte = chunkIndex * chunkSize;
+        const currentChunkEndByte = Math.min((chunkIndex + 1) * chunkSize - 1, fileSizeBytes - 1);
+
+        let sliceStart = 0;
+        let sliceEnd = currentChunkEndByte - currentChunkStartByte;
+
+        if (isRangeRequest) {
+          sliceStart = Math.max(0, startByte - currentChunkStartByte);
+          sliceEnd = Math.min(sliceEnd, endByte - currentChunkStartByte);
+        }
+
+        await new Promise<void>((resolve) => {
+          const streamOptions: any = { highWaterMark: 64 * 1024 };
+          if (isRangeRequest) {
+            streamOptions.start = sliceStart;
+            streamOptions.end = sliceEnd;
+          }
+
+          const chunkStream = fs.createReadStream(storageKey, streamOptions);
+
+          const onData = (chunk: any) => {
+            if (clientDisconnected || res.destroyed) {
+              chunkStream.destroy();
+              return resolve();
+            }
+            const ok = res.write(chunk);
+            if (!ok) {
+              chunkStream.pause();
+              res.once('drain', () => {
+                if (!clientDisconnected && !res.destroyed) {
+                  chunkStream.resume();
+                }
+              });
+            }
+          };
+
+          const onEnd = () => {
+            cleanup();
+            resolve();
+          };
+
+          const onError = () => {
+            cleanup();
+            chunkStream.destroy();
+            resolve();
+          };
+
+          const cleanup = () => {
+            chunkStream.removeListener('data', onData);
+            chunkStream.removeListener('end', onEnd);
+            chunkStream.removeListener('error', onError);
+          };
+
+          chunkStream.on('data', onData);
+          chunkStream.on('end', onEnd);
+          chunkStream.on('error', onError);
         });
       }
     }
 
-    res.end();
+    if (!res.writableEnded && !clientDisconnected && !res.destroyed) {
+      res.end();
+    }
   }
 }

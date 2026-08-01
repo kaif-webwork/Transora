@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "npx next dev -H 0.0.0.0 -p 3000",
+    "prebuild": "cd ../.. && npm run build --workspace=packages/shared",
     "build": "npx next build",
     "start": "npx next start",
     "lint": "npx next lint"
