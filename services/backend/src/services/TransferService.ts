@@ -406,10 +406,10 @@ export class TransferService {
         }
 
         await new Promise<void>((resolve) => {
-          const streamOptions: any = { highWaterMark: 64 * 1024 };
-          if (isRangeRequest) {
-            streamOptions.start = sliceStart;
-            streamOptions.end = sliceEnd;
+          const streamOptions: any = { highWaterMark: 32 * 1024 };
+          if (isRangeRequest && sliceStart <= sliceEnd && sliceEnd >= 0) {
+            streamOptions.start = Math.max(0, sliceStart);
+            streamOptions.end = Math.max(sliceStart, sliceEnd);
           }
 
           const chunkStream = fs.createReadStream(storageKey, streamOptions);
