@@ -17,11 +17,15 @@ export function useProgressiveDownloader() {
     setError(null);
 
     try {
-      // Direct backend download stream URL bypassing Vercel edge proxy and JS memory buffering
       const downloadUrl = getDirectBackendDownloadUrl(`/api/v1/transfers/${transferId}/files/${fileId}/download`);
 
-      // Trigger native browser download stream directly on current page so NO blank Loading... tab opens
-      window.location.href = downloadUrl;
+      // Trigger browser native file download stream via hidden anchor element without top-level window navigation
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
 
       setDownloadStarted(true);
       setTimeout(() => {
